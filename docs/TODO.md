@@ -15,18 +15,18 @@ independently verifiable, and ends in a runnable state.
 
 > Goal: a runnable TypeScript + Restate service with one durable handler and a passing test.
 
-- [ ] Initialize the TS project (`package.json`, `tsconfig.json`, strict mode, `src/` layout).
-- [ ] Add `@restatedev/restate-sdk`; create a trivial durable handler (e.g. `greet` that does one
+- [x] Initialize the TS project (`package.json`, `tsconfig.json`, strict mode, `src/` layout).
+- [x] Add `@restatedev/restate-sdk`; create a trivial durable handler (e.g. `greet` that does one
       `ctx.run` step).
-- [ ] Add an `npm run dev` script and document running `restate-server` + registering the deployment.
-- [ ] Add a minimal unit test (so CI has something to run) and a test runner (Vitest).
-- [ ] **Security:** add `.gitignore` and `.env.example`; confirm no secrets are committed.
-- [ ] **Docs:** README "quick start" (install, run server, register, call the handler).
+- [x] Add an `npm run dev` script and document running `restate-server` + registering the deployment.
+- [x] Add a minimal unit test (so CI has something to run) and a test runner (Vitest).
+- [x] **Security:** add `.gitignore` and `.env.example`; confirm no secrets are committed.
+- [x] **Docs:** README "quick start" (install, run server, register, call the handler).
 
 **Acceptance criteria**
-- [ ] `npm run build` and `npm test` pass.
-- [ ] With `restate-server` running and the deployment registered, calling `greet` returns a result.
-- [ ] `git status` shows no `.env` or other secrets staged.
+- [x] `npm run build` and `npm test` pass.
+- [x] With `restate-server` running and the deployment registered, calling `greet` returns a result.
+- [x] `git status` shows no `.env` or other secrets staged.
 
 ## Phase 1 — CI/CD & container
 

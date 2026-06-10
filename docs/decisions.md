@@ -112,3 +112,22 @@ that references it).
   API keys locally.
 - **Made by:** Human+Agent
 - **Date:** 2026-06-09
+
+### Build & test tooling: tsc + tsx + Vitest on ESM/NodeNext
+- **Decision:** TypeScript compiled with `tsc` (build), run in dev with `tsx`, tested with Vitest;
+  ESM + `NodeNext` module resolution; tests colocated as `*.test.ts` and excluded from the build.
+- **Alternatives:** `ts-node` / `nodemon`, Jest, CommonJS.
+- **Rationale / trade-offs:** `tsx` gives fast zero-config TS dev runs; Vitest is fast and ESM-native;
+  `NodeNext` matches the Restate SDK's Node target. NodeNext requires `.js` extensions on relative
+  imports in built source — accepted for standards alignment.
+- **Made by:** Agent
+- **Date:** 2026-06-09
+
+### Phase 0 service shape: pure logic separated from the durable handler
+- **Decision:** Keep pure functions (e.g. `composeGreeting`) in their own module, unit-tested directly;
+  the Restate handler wraps them in `ctx.run`. Services live under `src/services/`.
+- **Alternatives:** Put the logic inline in the handler.
+- **Rationale / trade-offs:** Pure logic is testable without a running Restate server (fast CI), and the
+  handler stays a thin durable wrapper — the pattern the agent loop reuses in later phases.
+- **Made by:** Agent
+- **Date:** 2026-06-09
