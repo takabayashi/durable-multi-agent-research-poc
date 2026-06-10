@@ -1,8 +1,20 @@
-import type * as restate from "@restatedev/restate-sdk";
+import * as restate from "@restatedev/restate-sdk";
 import type { Answer, SubResult, TokenUsage } from "../session/types.js";
-import { investigate } from "./investigator.js";
+import { investigator } from "./investigator.js";
 import { plan } from "./planner.js";
 import { synthesize } from "./synthesizer.js";
+
+const MAX_CONCURRENCY = Number(process.env.MAX_CONCURRENCY ?? 3);
+
+/** Split a list into batches of at most `size` (size <= 0 -> a single batch). Pure. */
+export function chunk<T>(items: T[], size: number): T[][] {
+  const width = size > 0 ? size : items.length || 1;
+  const batches: T[][] = [];
+  for (let i = 0; i < items.length; i += width) {
+    batches.push(items.slice(i, i + width));
+  }
+  return batches;
+}
 
 /**
  * Progress callbacks the orchestrator emits as it works. They let the Session
@@ -25,10 +37,9 @@ export interface ResearchHooks {
 /**
  * Per-turn orchestrator: plan -> investigate -> synthesize. Owns the research
  * *flow*; the caller (the Session) owns durable state and persists progress via
- * the hooks. Planner, investigators, and synthesizer are all real LLM work; each
- * investigator runs a durable ReAct loop over web_search + fetch_page. Phase 5
- * swaps the sequential loop for bounded parallel fan-out (RestatePromise.all)
- * without touching the Session.
+ * the hooks. The planner and synthesizer are durable LLM steps; investigators run
+ * as a separate stateless service, fanned out concurrently in batches of
+ * MAX_CONCURRENCY (RestatePromise.all) and capped at MAX_SUBQUESTIONS breadth.
  */
 export async function runResearch(
   ctx: restate.Context,
@@ -43,22 +54,35 @@ export async function runResearch(
     return { text: planned.plan.directAnswer, citations: [] };
   }
 
-  // 2) Investigate each sub-question with a real ReAct loop over the tools,
-  //    reporting observable progress.
+  // 2) Investigate sub-questions concurrently, in batches of MAX_CONCURRENCY,
+  //    via the stateless investigator service. Progress is reported per batch.
   hooks.onSubQuestions(planned.plan.subQuestions);
 
+  const indexed = planned.plan.subQuestions.map((q, i) => ({ q, i }));
   const subResults: SubResult[] = [];
-  for (const [i, q] of planned.plan.subQuestions.entries()) {
-    hooks.onInvestigationStart(i);
-    const { result, usage, toolCalls } = await investigate(ctx, q, i);
-    for (const u of usage) {
-      hooks.onUsage(u);
+  for (const group of chunk(indexed, MAX_CONCURRENCY)) {
+    for (const { i } of group) {
+      hooks.onInvestigationStart(i);
     }
-    for (const name of toolCalls) {
-      hooks.onToolCall(name);
+    const settled = await restate.RestatePromise.all(
+      group.map(({ q, i }) =>
+        ctx.serviceClient(investigator).investigate({ question: q, index: i }),
+      ),
+    );
+    for (const [k, { i }] of group.entries()) {
+      const r = settled[k];
+      if (!r) {
+        continue;
+      }
+      for (const u of r.usage) {
+        hooks.onUsage(u);
+      }
+      for (const name of r.toolCalls) {
+        hooks.onToolCall(name);
+      }
+      hooks.onInvestigationDone(i, r.result);
+      subResults.push(r.result);
     }
-    hooks.onInvestigationDone(i, result);
-    subResults.push(result);
   }
 
   // 3) Synthesize a structured, cited answer.
