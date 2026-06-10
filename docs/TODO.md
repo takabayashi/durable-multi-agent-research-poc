@@ -94,16 +94,16 @@ independently verifiable, and ends in a runnable state.
 
 > Goal: orchestrator fans out investigators concurrently, within a bound. (FR3, NFR5)
 
-- [ ] Wire planner → parallel investigators → synthesizer (orchestrator-worker topology). (FR3)
-- [ ] Run investigators via `RestatePromise.all`, batched at `MAX_CONCURRENCY`. (NFR5)
-- [ ] Enforce agentic breadth cap `MAX_SUBQUESTIONS`; aggregate sub-results for synthesis.
-- [ ] **Security:** ensure bounds are enforced server-side (not LLM-controlled) to cap rate/cost.
-- [ ] **Docs:** document the two concurrency knobs and the rationale for the defaults.
+- [x] Wire planner → parallel investigators → synthesizer (orchestrator-worker topology). (FR3)
+- [x] Run investigators via `RestatePromise.all`, batched at `MAX_CONCURRENCY`. (NFR5)
+- [x] Enforce agentic breadth cap `MAX_SUBQUESTIONS`; aggregate sub-results for synthesis.
+- [x] **Security:** ensure bounds are enforced server-side (not LLM-controlled) to cap rate/cost.
+- [x] **Docs:** document the two concurrency knobs and the rationale for the defaults.
 
 **Acceptance criteria**
-- [ ] A multi-part question runs several investigators concurrently (visible in the journal/logs).
-- [ ] No more than `MAX_CONCURRENCY` investigators run at once; breadth never exceeds `MAX_SUBQUESTIONS`.
-- [ ] The canonical query (Datadog vs Snowflake) returns a synthesized, cited answer.
+- [x] A multi-part question runs several investigators concurrently (visible in the journal/logs).
+- [x] No more than `MAX_CONCURRENCY` investigators run at once; breadth never exceeds `MAX_SUBQUESTIONS`.
+- [x] The canonical query (Datadog vs Snowflake) returns a synthesized, cited answer.
 
 ## Phase 6 — Durability & crash-resume hardening
 

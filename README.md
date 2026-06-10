@@ -10,10 +10,10 @@ unnecessarily.
 See [`docs/requirements.md`](docs/requirements.md) for the full PRD, [`docs/TODO.md`](docs/TODO.md) for
 the phased build plan, and [`docs/decisions.md`](docs/decisions.md) for the decision log.
 
-> Status: **Phase 4** — a turn runs a real planner and synthesizer, and each sub-question is
-> investigated by a real ReAct loop over `web_search` (Tavily) + `fetch_page` durable tools. See
-> [`docs/prompts.md`](docs/prompts.md) for the prompt/tool/LLM-wrapper design and
-> [`docs/TODO.md`](docs/TODO.md) for the roadmap.
+> Status: **Phase 5** — a turn runs a real planner and synthesizer, and sub-questions are investigated
+> by real ReAct loops over `web_search` (Tavily) + `fetch_page`, fanned out concurrently (bounded by
+> `MAX_CONCURRENCY`). See [`docs/prompts.md`](docs/prompts.md) for the prompt/tool/LLM-wrapper design
+> and [`docs/TODO.md`](docs/TODO.md) for the roadmap.
 
 ## Prerequisites
 
@@ -105,7 +105,7 @@ src/
   agents/
     orchestrator.ts   # per-turn flow: plan -> investigate -> synthesize (runResearch)
     planner.ts        # durable plan(); planner.prompt.ts holds its prompt + schema
-    investigator.ts   # durable ReAct loop; investigator.prompt.ts holds its prompt
+    investigator.ts   # stateless investigator service (ReAct loop); investigator.prompt.ts holds its prompt
     synthesizer.ts    # durable synthesize(); synthesizer.prompt.ts holds its prompt + schema
   session/
     session.ts        # durable Session virtual object (start/sendTurn/getProgress/getResult)
@@ -119,8 +119,8 @@ Configuration is via environment variables (see [`.env.example`](.env.example)).
 `OPENAI_API_KEY` and `TAVILY_API_KEY`; the per-role models (`OPENAI_MODEL_PLANNER` / `_INVESTIGATOR` /
 `_SYNTHESIZER`), the breadth cap (`MAX_SUBQUESTIONS`, default 5), and the tool bounds
 (`WEB_SEARCH_MAX_RESULTS`, `FETCH_PAGE_MAX_CHARS`, `MAX_TOOL_TURNS`, `MAX_SOURCES`) are read at
-runtime. `PORT` (default `9080`) sets the service endpoint. The concurrency/freshness knobs are used
-from Phase 5+.
+runtime. `MAX_CONCURRENCY` (default 3) bounds how many investigators run at once. `PORT` (default
+`9080`) sets the service endpoint. The freshness knob is used from Phase 7+.
 
 ## Continuous integration
 

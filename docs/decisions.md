@@ -280,6 +280,22 @@ that references it).
 - **Made by:** Human+Agent
 - **Date:** 2026-06-10
 
+### Planner defaults to investigate; `trivial` is a narrow exception
+- **Decision:** Harden `PLANNER_SYSTEM` so the planner defaults to decomposition and only sets
+  `trivial=true` under strict conditions (single self-contained definitional question, answerable
+  from general knowledge, no person/company/product/statistic/current facts, high confidence). It
+  explicitly disqualifies entity-specific and multi-topic ("X and Y", compare/vs) questions and adds
+  an "if in doubt, trivial=false" tiebreaker.
+- **Alternatives:** Remove the trivial branch entirely; add a server-side heuristic gate; switch the
+  planner off the nano model.
+- **Rationale / trade-offs:** A real research question ("Who is Daniel Takabayashi and what is Marvin
+  AI") was intermittently classified `trivial`, short-circuiting investigation/synthesis. The trivial
+  shortcut is still worth keeping for genuinely definitional asks, so we bias the prompt rather than
+  drop the branch. Prompt-level mitigation is non-deterministic (especially on the nano planner
+  model); a deterministic guard remains a possible follow-up.
+- **Made by:** Human+Agent
+- **Date:** 2026-06-10
+
 ## Phase 4 — Tools & investigator
 
 ### Sources derived from executed tools, not model claims
@@ -338,5 +354,22 @@ that references it).
 - **Alternatives:** Nothing in state (journal only); a full per-turn `TraceEvent[]` now.
 - **Rationale / trade-offs:** Cheap, replay-safe visibility into tool activity without state bloat; the
   full queryable trace (`getTrace`) remains a Phase 10 deliverable.
+- **Made by:** Human+Agent
+- **Date:** 2026-06-10
+
+## Phase 5 — Parallel investigation
+
+### Investigators as a stateless service, fanned out with bounded concurrency
+- **Decision:** The investigator is a stateless Restate service (`investigator.investigate`), invoked
+  once per sub-question; the orchestrator fans them out concurrently in batches of `MAX_CONCURRENCY`
+  (default 3) via `RestatePromise.all`, while the planner's `applyBreadthCap` keeps breadth <=
+  `MAX_SUBQUESTIONS` (default 5). Both bounds are enforced server-side, never LLM-controlled.
+- **Alternatives:** Run investigations in-process within the Session invocation; a streaming semaphore
+  pool instead of batching; LLM-chosen concurrency.
+- **Rationale / trade-offs:** A service per investigation gives each its own invocation/journal (true,
+  observable parallelism) and fulfils the Phase-0 "stateless Service investigators" decision. Batching
+  is the pattern Restate documents and matches the TODO; the trade-offs are batch-granular progress (a
+  batch flips to running together) and a barrier between batches, both fine at this scale. Server-side
+  bounds protect OpenAI/Tavily rate limits and cost.
 - **Made by:** Human+Agent
 - **Date:** 2026-06-10

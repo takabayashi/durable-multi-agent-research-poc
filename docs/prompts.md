@@ -2,7 +2,8 @@
 
 How the assistant talks to the model and the web. The **planner** and **synthesizer** are single
 durable LLM steps; each **investigator** runs a durable ReAct loop (LLM <-> tools) over `web_search`
-(Tavily) and `fetch_page` to investigate one sub-question and return a sourced sub-result.
+(Tavily) and `fetch_page` to investigate one sub-question. Investigators run as a stateless Restate
+service that the orchestrator fans out concurrently, bounded by `MAX_CONCURRENCY`.
 
 ## Composition model
 
@@ -56,6 +57,9 @@ Return only the structured object.
 
 ## Investigator (ReAct loop)
 
+- Runs as a stateless Restate service (`investigator.investigate({ question, index })`); each call is
+  its own invocation/journal, so the orchestrator fans out many concurrently (in batches of
+  `MAX_CONCURRENCY`, via `RestatePromise.all`).
 - Model: `OPENAI_MODEL_INVESTIGATOR` (default `gpt-5.4-mini`).
 - Tools: `web_search(query)` (Tavily) and `fetch_page(url)`. Loop: call the model with the running
   conversation + tool defs; if it emits a `function_call`, run that tool as a durable step and append
@@ -155,8 +159,6 @@ needs no key.
 
 Deterministic and stable across replay, so journal entries, logs, and (later) traces correlate:
 
-- `planner` — the planning call
-- `investigate:<i>:llm:<n>` — the n-th LLM turn of the i-th sub-question's ReAct loop
-  (`investigate:<i>:llm:final` for the degraded summary)
-- `investigate:<i>:tool:<n>:<k>` — the k-th tool call in that turn (`web_search` / `fetch_page`)
-- `synthesizer` — the synthesis call
+- `planner` / `synthesizer` — the planning and synthesis calls (in the Session invocation)
+- each investigator is its own `investigator` service invocation, whose steps are `llm:<n>`
+  (`llm:final` for the degraded summary) and `tool:<n>:<k>` (`web_search` / `fetch_page`)
