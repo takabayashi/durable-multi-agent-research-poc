@@ -11,6 +11,15 @@ describe("plannerInput", () => {
     expect(user?.content).toContain("Compare A and B");
     expect(user?.content.toLowerCase()).toContain("untrusted data");
   });
+
+  it("anchors the trivial decision with both trivial and non-trivial examples", () => {
+    const [system] = plannerInput("anything", 5);
+    const content = system?.content.toLowerCase() ?? "";
+    // A definitional example must stay (guards against over-correcting, e.g. the NRR case).
+    expect(content).toContain("nrr");
+    // A non-trivial example must stay (guards against the false-trivial regression).
+    expect(content).toContain("not trivial");
+  });
 });
 
 describe("PlanSchema", () => {

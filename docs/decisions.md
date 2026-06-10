@@ -296,6 +296,21 @@ that references it).
 - **Made by:** Human+Agent
 - **Date:** 2026-06-10
 
+### Planner trivial/decompose anchored by few-shot examples (supersedes the above)
+- **Decision:** Replace the abstract "default to investigate / if in doubt trivial=false" framing with
+  a short balanced classifier plus concrete examples in both directions (e.g. "What does NRR stand
+  for?" -> trivial; "Who is <person> and what is <product>?" -> investigate), and a tie-breaker that
+  only leans to investigate when current/specific/source-backed facts are needed.
+- **Alternatives:** Keep tightening adjectives in the rules; add a deterministic server-side gate;
+  upgrade the planner model.
+- **Rationale / trade-offs:** The previous hardening over-corrected — a genuinely definitional question
+  ("What does NRR stand for?") triggered a full 5-search investigation. Few-shot examples give the small
+  planner model pattern anchors for both classes, fixing the over-correction without reintroducing the
+  false-trivial failure. Still probabilistic; the deterministic gate remains the fallback for a hard
+  guarantee.
+- **Made by:** Human+Agent
+- **Date:** 2026-06-10
+
 ## Phase 4 — Tools & investigator
 
 ### Sources derived from executed tools, not model claims
