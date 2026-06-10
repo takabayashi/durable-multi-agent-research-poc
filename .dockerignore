@@ -1,0 +1,15 @@
+node_modules
+dist
+.git
+.gitignore
+.github
+.cursor
+docs
+*.md
+.env
+.env.*
+*.pdf
+*.log
+coverage
+.DS_Store
+biome.json
