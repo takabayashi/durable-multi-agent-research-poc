@@ -9,16 +9,22 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
     "dev": "tsx watch src/app.ts",
     "start": "node dist/app.js",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "lint": "biome check .",
+    "lint:ci": "biome ci .",
+    "format": "biome check --write .",
+    "check": "npm run lint:ci && npm run typecheck && npm run build && npm test"
   },
   "license": "MIT",
   "dependencies": {
     "@restatedev/restate-sdk": "^1.14.5"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.16",
     "@types/node": "^25.9.2",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
