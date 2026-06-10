@@ -1,19 +1,43 @@
 export type TurnStatus = "pending" | "running" | "done" | "failed";
 export type SubQuestionStatus = "pending" | "running" | "done";
 
-export interface Citation {
+/**
+ * A source discovered while investigating a sub-question. The `id` (e.g. "S1")
+ * is stable within a turn so the synthesizer can cite it inline as [S1] and we
+ * can resolve those citations back to real sources.
+ */
+export interface Source {
+  id: string;
   title: string;
   url: string;
 }
 
 export interface Answer {
   text: string;
-  citations: Citation[];
+  citations: Source[];
 }
 
 export interface SubQuestion {
   q: string;
   status: SubQuestionStatus;
+  findings?: string;
+  sources?: Source[];
+}
+
+/** A sub-question's investigated result, fed to the synthesizer. */
+export interface SubResult {
+  q: string;
+  findings: string;
+  sources: Source[];
+}
+
+/** Token usage for a single durable LLM step (one `ctx.run`). */
+export interface TokenUsage {
+  step: string;
+  model: string;
+  inputTokens: number;
+  cachedTokens: number;
+  outputTokens: number;
 }
 
 export interface Turn {
@@ -22,7 +46,14 @@ export interface Turn {
   status: TurnStatus;
   subQuestions: SubQuestion[];
   answer?: Answer;
+  usage?: TokenUsage[];
   createdAt: number;
+}
+
+/** Lean per-sub-question view exposed in progress (no findings/sources leak). */
+export interface SubQuestionProgress {
+  q: string;
+  status: SubQuestionStatus;
 }
 
 /** Read-only snapshot returned by the Session's getProgress handler. */
@@ -31,5 +62,5 @@ export interface Progress {
   status: TurnStatus | "idle";
   currentTurnId: string | null;
   message: string | null;
-  subQuestions: SubQuestion[];
+  subQuestions: SubQuestionProgress[];
 }
