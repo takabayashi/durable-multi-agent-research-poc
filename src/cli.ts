@@ -28,25 +28,33 @@ async function cmdTurn(sessionId: string, message: string): Promise<void> {
   const rs = ingress();
   const obj = rs.objectClient<SessionObject>(SESSION, sessionId);
 
-  // Fire-and-forget the (long-running) turn, then poll progress until it finishes.
-  await rs.objectSendClient<SessionObject>(SESSION, sessionId).sendTurn({ message });
+  // Fire-and-forget the (long-running) turn with a client-supplied id, then poll
+  // progress for *this* turn id — so we never mistake a just-finished prior turn for
+  // ours, and we don't block the CLI on the whole turn's request-response.
+  const turnId = randomUUID();
+  await rs.objectSendClient<SessionObject>(SESSION, sessionId).sendTurn({ message, turnId });
 
   let last = "";
   let done = false;
   while (!done) {
     const p = await obj.getProgress();
-    const rendered = renderProgress(p);
-    if (rendered !== last) {
-      console.log(rendered);
-      last = rendered;
+    // Only trust progress once it reflects the turn we submitted; otherwise we may
+    // observe the previous (already-done) turn before ours registers.
+    const isOurTurn = p.currentTurnId === turnId;
+    if (isOurTurn) {
+      const rendered = renderProgress(p);
+      if (rendered !== last) {
+        console.log(rendered);
+        last = rendered;
+      }
+      done = p.status === "done" || p.status === "failed";
     }
-    done = p.status === "done" || p.status === "failed";
     if (!done) {
       await sleep(700);
     }
   }
 
-  const result = await obj.getResult({});
+  const result = await obj.getResult({ turnId });
   if (result?.answer) {
     console.log(`\nAnswer:\n${result.answer.text}`);
     if (result.answer.citations.length > 0) {

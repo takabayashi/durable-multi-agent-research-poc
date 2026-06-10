@@ -4,6 +4,8 @@ import type { Progress, TokenUsage, Turn } from "./types.js";
 
 interface SendTurnInput {
   message: string;
+  /** Client-supplied turn id, so the caller can poll/await the exact turn it submitted. */
+  turnId?: string;
 }
 
 async function loadTurns(
@@ -46,7 +48,7 @@ export const session = restate.object({
         throw new restate.TerminalError("message must be a non-empty string");
       }
 
-      const turnId = ctx.rand.uuidv4();
+      const turnId = input?.turnId ?? ctx.rand.uuidv4();
       const usage: TokenUsage[] = [];
       const toolCalls: Record<string, number> = {};
       const turn: Turn = {
