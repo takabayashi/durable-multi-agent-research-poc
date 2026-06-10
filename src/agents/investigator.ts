@@ -8,6 +8,12 @@ import { investigatorInput } from "./investigator.prompt.js";
 const INVESTIGATOR_MODEL = process.env.OPENAI_MODEL_INVESTIGATOR ?? "gpt-5.4-mini";
 const MAX_TOOL_TURNS = Number(process.env.MAX_TOOL_TURNS ?? 5);
 
+// Each investigator runs a multi-step ReAct loop of long LLM calls; raise the
+// inactivity timeout above the longest expected call so Restate doesn't treat an
+// in-flight call as stuck (requires restate-server >= 1.4). See session.ts.
+const INACTIVITY_TIMEOUT_MS = Number(process.env.RESTATE_INACTIVITY_TIMEOUT_MS ?? 300_000);
+const ABORT_TIMEOUT_MS = Number(process.env.RESTATE_ABORT_TIMEOUT_MS ?? 60_000);
+
 export interface InvestigateInput {
   question: string;
   /** Sub-question index within the turn; used to mint stable source ids S{index+1}-{k}. */
@@ -93,6 +99,10 @@ export const investigator = restate.service({
         toolCalls,
       };
     },
+  },
+  options: {
+    inactivityTimeout: INACTIVITY_TIMEOUT_MS,
+    abortTimeout: ABORT_TIMEOUT_MS,
   },
 });
 

@@ -2,6 +2,13 @@ import * as restate from "@restatedev/restate-sdk";
 import { runResearch } from "../agents/orchestrator.js";
 import type { Progress, TokenUsage, Turn } from "./types.js";
 
+// Long LLM steps (planner/synthesizer) make no journal progress while in flight,
+// so raise Restate's inactivity timeout above the longest expected call; the
+// abort timeout is the grace period before a stalled attempt is force-aborted.
+// Require restate-server >= 1.4 (sent during service discovery).
+const INACTIVITY_TIMEOUT_MS = Number(process.env.RESTATE_INACTIVITY_TIMEOUT_MS ?? 300_000);
+const ABORT_TIMEOUT_MS = Number(process.env.RESTATE_ABORT_TIMEOUT_MS ?? 60_000);
+
 interface SendTurnInput {
   message: string;
   /** Client-supplied turn id, so the caller can poll/await the exact turn it submitted. */
@@ -147,6 +154,10 @@ export const session = restate.object({
         return order.map((id) => turns[id]).filter((t): t is Turn => Boolean(t));
       },
     ),
+  },
+  options: {
+    inactivityTimeout: INACTIVITY_TIMEOUT_MS,
+    abortTimeout: ABORT_TIMEOUT_MS,
   },
 });
 
