@@ -34,6 +34,8 @@ async function cmdTurn(sessionId: string, message: string): Promise<void> {
   const turnId = randomUUID();
   await rs.objectSendClient<SessionObject>(SESSION, sessionId).sendTurn({ message, turnId });
 
+  console.log("SessionId: ", sessionId, " | TurnId: ", turnId);
+
   let last = "";
   let done = false;
   while (!done) {
