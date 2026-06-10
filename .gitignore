@@ -35,5 +35,5 @@ Thumbs.db
 .idea/
 *.iml
 
-# Cursor local planning/scratch (rules are tracked; plans are not)
-.cursor/plans/
+# Cursor local files (rules, plans) are kept local, not tracked
+.cursor/
