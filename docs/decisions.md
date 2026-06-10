@@ -429,3 +429,21 @@ that references it).
   duplicate external effects". Cheap to add back later, since the wrapper is the single LLM chokepoint.
 - **Made by:** Human+Agent
 - **Date:** 2026-06-10
+
+## CLI refactor — presentation split + `util.parseArgs`
+
+### CLI presentation extracted to `cli.output.ts`; argv parsed via `util.parseArgs`
+- **Decision:** Move the CLI's pure formatting (`renderProgress`, `aggregateUsage`,
+  `formatTurnResult`) into [`src/cli.output.ts`](../src/cli.output.ts) so [`src/cli.ts`](../src/cli.ts)
+  keeps only routing + Restate IO, and parse argv with Node's built-in `node:util` `parseArgs`
+  (`allowPositionals`, `strict: false`) instead of a hand-rolled `process.argv` switch.
+- **Supersedes:** "CLI: hand-rolled argv" (Phase 2) — still no third-party CLI framework; `parseArgs`
+  is a Node built-in, not a dependency.
+- **Alternatives:** Keep all formatting inline in `cli.ts`; adopt commander/yargs.
+- **Rationale / trade-offs:** Shrinks the entry file and makes the formatting unit-testable
+  ([`src/cli.output.test.ts`](../src/cli.output.test.ts)) for the first time, with output strings
+  unchanged. `strict: false` preserves the old lenient parsing, with the known edge case that a
+  message token literally starting with `--` is read as a flag (irrelevant for quoted
+  natural-language queries).
+- **Made by:** Human+Agent
+- **Date:** 2026-06-10
