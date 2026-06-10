@@ -16,8 +16,7 @@ independently verifiable, and ends in a runnable state.
 > Goal: a runnable TypeScript + Restate service with one durable handler and a passing test.
 
 - [x] Initialize the TS project (`package.json`, `tsconfig.json`, strict mode, `src/` layout).
-- [x] Add `@restatedev/restate-sdk`; create a trivial durable handler (e.g. `greet` that does one
-      `ctx.run` step).
+- [x] Add `@restatedev/restate-sdk`; create a trivial durable handler (e.g. `greet` that does one `ctx.run` step).
 - [x] Add an `npm run dev` script and document running `restate-server` + registering the deployment.
 - [x] Add a minimal unit test (so CI has something to run) and a test runner (Vitest).
 - [x] **Security:** add `.gitignore` and `.env.example`; confirm no secrets are committed.
@@ -48,8 +47,7 @@ independently verifiable, and ends in a runnable state.
 
 > Goal: durable multi-turn sessions with observable progress, using mocked answers and a CLI.
 
-- [ ] Implement the Session Virtual Object: `startSession`, `sendTurn`, and a `getProgress` shared
-      (read-only) handler. (FR1, NFR2, NFR4)
+- [ ] Implement the Session Virtual Object: `startSession`, `sendTurn`, and a `getProgress` shared (read-only) handler. (FR1, NFR2, NFR4)
 - [ ] Model session state: turn history, per-turn status, sub-question list (mocked).
 - [ ] Return a canned, cited answer from recorded fixtures for the canonical query.
 - [ ] Build the CLI (`@restatedev/restate-sdk-clients`): start session, send turn, poll progress.
@@ -65,10 +63,8 @@ independently verifiable, and ends in a runnable state.
 
 > Goal: real decomposition and cited synthesis; investigator results still stubbed.
 
-- [ ] Add an LLM wrapper around the `openai` SDK that runs inside `ctx.run`, **returns token usage
-      (incl. model)**, and emits Tier-1 structured logs with stable step names. (FR2)
-- [ ] Planner: decompose a question into sub-questions (bounded breadth), or answer immediately for
-      trivial questions. (FR2)
+- [ ] Add an LLM wrapper around the `openai` SDK that runs inside `ctx.run`, **returns token usage (incl. model)**, and emits Tier-1 structured logs with stable step names. (FR2)
+- [ ] Planner: decompose a question into sub-questions (bounded breadth), or answer immediately for trivial questions. (FR2)
 - [ ] Synthesizer: combine stubbed sub-results into a structured answer with citations. (FR4)
 - [ ] Disable native parallel tool-calls; set deterministic step naming conventions.
 - [ ] **Security:** treat model output as data; never log secrets; truncate logged prompts/responses.
@@ -84,8 +80,7 @@ independently verifiable, and ends in a runnable state.
 > Goal: real, durable, idempotent tools and a single end-to-end real investigator. (FR6)
 
 - [ ] Implement `web_search` (Tavily) and `fetch_page` as `ctx.run` durable steps with stable keys.
-- [ ] Implement an investigator ReAct loop (LLM ↔ tools) for one sub-question, producing a cited
-      sub-result. (FR6)
+- [ ] Implement an investigator ReAct loop (LLM ↔ tools) for one sub-question, producing a cited sub-result. (FR6)
 - [ ] Bound + truncate tool outputs before feeding them back to the model.
 - [ ] **Security:** treat fetched content as untrusted data (no instruction-following); cap sizes.
 - [ ] **Docs:** document the tool contracts and the investigator loop.
@@ -107,8 +102,7 @@ independently verifiable, and ends in a runnable state.
 
 **Acceptance criteria**
 - [ ] A multi-part question runs several investigators concurrently (visible in the journal/logs).
-- [ ] No more than `MAX_CONCURRENCY` investigators run at once; breadth never exceeds
-      `MAX_SUBQUESTIONS`.
+- [ ] No more than `MAX_CONCURRENCY` investigators run at once; breadth never exceeds `MAX_SUBQUESTIONS`.
 - [ ] The canonical query (Datadog vs Snowflake) returns a synthesized, cited answer.
 
 ## Phase 6 — Durability & crash-resume hardening
@@ -131,8 +125,7 @@ independently verifiable, and ends in a runnable state.
 > Goal: "go deeper on point N" reuses relevant prior work instead of restarting. (FR5)
 
 - [ ] Store prior sub-results keyed by a normalized question hash with timestamps in session state.
-- [ ] On refinement, reuse fresh prior sub-results (within `FRESHNESS_TTL`) and investigate only the
-      deeper angle; otherwise refresh. (FR5)
+- [ ] On refinement, reuse fresh prior sub-results (within `FRESHNESS_TTL`) and investigate only the deeper angle; otherwise refresh. (FR5)
 - [ ] Surface "what was reused vs redone" in the turn result.
 - [ ] **Security:** bound reuse lookups; expire stale entries to avoid serving outdated research.
 - [ ] **Docs:** document the reuse/freshness model and how it differs from idempotency.
@@ -146,8 +139,7 @@ independently verifiable, and ends in a runnable state.
 
 > Goal: handle contradicting turns and expose per-session token/tool metrics.
 
-- [ ] Cancellation/supersession: a superseding turn cancels the in-flight invocation and marks the
-      prior turn superseded.
+- [ ] Cancellation/supersession: a superseding turn cancels the in-flight invocation and marks the prior turn superseded.
 - [ ] Implement the `Metrics` object (tokens by model + tool-call counts) merged by the turn handler.
 - [ ] Add a `getMetrics` shared handler; CLI prints metrics per turn (and "tokens saved by reuse").
 - [ ] **Security:** ensure cancellation runs compensations/cleanup without leaving partial effects.
@@ -162,13 +154,10 @@ independently verifiable, and ends in a runnable state.
 
 > Goal: unit + integration coverage across representative queries and edge cases.
 
-- [ ] Unit tests: planner decomposition, synthesizer citations, tool wrappers, metrics merge,
-      reuse/freshness logic.
-- [ ] Integration tests with `@restatedev/restate-sdk-testcontainers` across the demo query set
-      (Q1–Q6), including the immediate-answer and refinement branches.
+- [ ] Unit tests: planner decomposition, synthesizer citations, tool wrappers, metrics merge, reuse/freshness logic.
+- [ ] Integration tests with `@restatedev/restate-sdk-testcontainers` across the demo query set (Q1–Q6), including the immediate-answer and refinement branches.
 - [ ] Edge cases: malformed input, tool failure/degradation, supersession, duplicate idempotency key.
-- [ ] **Security:** a test asserting fetched content cannot inject instructions; a secret-scan smoke
-      test.
+- [ ] **Security:** a test asserting fetched content cannot inject instructions; a secret-scan smoke test.
 - [ ] **Docs:** README "running the tests".
 
 **Acceptance criteria**
@@ -211,8 +200,7 @@ independently verifiable, and ends in a runnable state.
 
 > Goal: a clear design write-up and a clean, reproducible repository.
 
-- [ ] Design note (in the README): agent topology and why; which Restate primitives solve which
-      property; trade-offs and future-work.
+- [ ] Design note (in the README): agent topology and why; which Restate primitives solve which property; trade-offs and future-work.
 - [ ] README end-to-end: setup, run, CLI demo (canonical query), durability demo, minikube.
 - [ ] Final repro pass: fresh-clone smoke test of the documented commands.
 - [ ] **Security:** final secret-scan + manual review of committed files before tagging.
