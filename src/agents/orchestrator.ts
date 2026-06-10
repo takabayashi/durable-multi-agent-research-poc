@@ -1,6 +1,6 @@
 import type * as restate from "@restatedev/restate-sdk";
 import type { Answer, SubResult, TokenUsage } from "../session/types.js";
-import { investigateStub } from "./investigation.js";
+import { investigate } from "./investigator.js";
 import { plan } from "./planner.js";
 import { synthesize } from "./synthesizer.js";
 
@@ -12,6 +12,8 @@ import { synthesize } from "./synthesizer.js";
 export interface ResearchHooks {
   /** A durable LLM step (planner or synthesizer) reported its token usage. */
   onUsage(usage: TokenUsage): void;
+  /** A tool (web_search / fetch_page) was invoked during an investigation. */
+  onToolCall(name: string): void;
   /** The planner produced the sub-questions to investigate. */
   onSubQuestions(questions: string[]): void;
   /** Investigation of the i-th sub-question has started. */
@@ -23,9 +25,10 @@ export interface ResearchHooks {
 /**
  * Per-turn orchestrator: plan -> investigate -> synthesize. Owns the research
  * *flow*; the caller (the Session) owns durable state and persists progress via
- * the hooks. The planner and synthesizer are real LLM calls; investigation is
- * stubbed (investigateStub) until Phase 4. Phase 5 swaps the sequential loop for
- * bounded parallel fan-out (RestatePromise.all) without touching the Session.
+ * the hooks. Planner, investigators, and synthesizer are all real LLM work; each
+ * investigator runs a durable ReAct loop over web_search + fetch_page. Phase 5
+ * swaps the sequential loop for bounded parallel fan-out (RestatePromise.all)
+ * without touching the Session.
  */
 export async function runResearch(
   ctx: restate.Context,
@@ -40,13 +43,20 @@ export async function runResearch(
     return { text: planned.plan.directAnswer, citations: [] };
   }
 
-  // 2) Investigate each sub-question (stubbed), reporting observable progress.
+  // 2) Investigate each sub-question with a real ReAct loop over the tools,
+  //    reporting observable progress.
   hooks.onSubQuestions(planned.plan.subQuestions);
 
   const subResults: SubResult[] = [];
   for (const [i, q] of planned.plan.subQuestions.entries()) {
     hooks.onInvestigationStart(i);
-    const result = await ctx.run(`investigate:${i}`, () => investigateStub(q, i));
+    const { result, usage, toolCalls } = await investigate(ctx, q, i);
+    for (const u of usage) {
+      hooks.onUsage(u);
+    }
+    for (const name of toolCalls) {
+      hooks.onToolCall(name);
+    }
     hooks.onInvestigationDone(i, result);
     subResults.push(result);
   }

@@ -47,6 +47,8 @@ export interface Turn {
   subQuestions: SubQuestion[];
   answer?: Answer;
   usage?: TokenUsage[];
+  /** Per-turn tool-call counts by tool name, e.g. { web_search: 2, fetch_page: 3 }. */
+  toolCalls?: Record<string, number>;
   createdAt: number;
 }
 

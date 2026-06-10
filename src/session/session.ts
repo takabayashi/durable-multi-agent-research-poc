@@ -48,12 +48,14 @@ export const session = restate.object({
 
       const turnId = ctx.rand.uuidv4();
       const usage: TokenUsage[] = [];
+      const toolCalls: Record<string, number> = {};
       const turn: Turn = {
         turnId,
         message,
         status: "running",
         subQuestions: [],
         usage,
+        toolCalls,
         createdAt: await ctx.date.now(),
       };
 
@@ -73,6 +75,10 @@ export const session = restate.object({
         turn.answer = await runResearch(ctx, message, {
           onUsage: (u) => {
             usage.push(u);
+            persist();
+          },
+          onToolCall: (name) => {
+            toolCalls[name] = (toolCalls[name] ?? 0) + 1;
             persist();
           },
           onSubQuestions: (questions) => {

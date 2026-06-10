@@ -71,6 +71,13 @@ async function cmdTurn(sessionId: string, message: string): Promise<void> {
       console.log(`  - ${model}: in=${t.input} cached=${t.cached} out=${t.output}`);
     }
   }
+
+  if (result?.toolCalls && Object.keys(result.toolCalls).length > 0) {
+    console.log("\nTool calls (this turn):");
+    for (const [name, count] of Object.entries(result.toolCalls)) {
+      console.log(`  - ${name}: ${count}`);
+    }
+  }
 }
 
 async function cmdProgress(sessionId: string): Promise<void> {
