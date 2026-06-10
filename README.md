@@ -10,15 +10,18 @@ unnecessarily.
 See [`docs/requirements.md`](docs/requirements.md) for the full PRD, [`docs/TODO.md`](docs/TODO.md) for
 the phased build plan, and [`docs/decisions.md`](docs/decisions.md) for the decision log.
 
-> Status: **Phase 5** — a turn runs a real planner and synthesizer, and sub-questions are investigated
-> by real ReAct loops over `web_search` (Tavily) + `fetch_page`, fanned out concurrently (bounded by
-> `MAX_CONCURRENCY`). See [`docs/prompts.md`](docs/prompts.md) for the prompt/tool/LLM-wrapper design
-> and [`docs/TODO.md`](docs/TODO.md) for the roadmap.
+> Status: **Phase 6** — durability hardening. A turn runs a real planner and synthesizer, sub-questions
+> are investigated by real ReAct loops over `web_search` (Tavily) + `fetch_page` fanned out concurrently
+> (bounded by `MAX_CONCURRENCY`), and long LLM calls get raised Restate inactivity/abort timeouts so
+> they aren't treated as stuck. See [`docs/prompts.md`](docs/prompts.md) for the prompt/tool/LLM-wrapper
+> design, "Durability & crash-resume" below, and [`docs/TODO.md`](docs/TODO.md) for the roadmap.
 
 ## Prerequisites
 
 - **Node.js >= 20** (developed on Node 22).
-- **Restate server + CLI.** Install per the [Restate docs](https://docs.restate.dev). Quick options:
+- **Restate server + CLI, >= 1.4** (the service declares per-service inactivity/abort timeouts, sent
+  during discovery; older servers reject registration). Install per the
+  [Restate docs](https://docs.restate.dev). Quick options:
   - macOS (Homebrew): `brew install restatedev/tap/restate-server restatedev/tap/restate`
   - or run on demand with `npx @restatedev/restate-server` and `npx @restatedev/restate`
 
@@ -84,6 +87,38 @@ per-turn tool-call count. See
 [`docs/prompts.md`](docs/prompts.md) and [`docs/examples.md`](docs/examples.md). Kill the service
 mid-turn and restart it - the turn resumes without repeating completed LLM or tool calls.
 
+## Durability & crash-resume
+
+The headline property: a turn survives a process crash and resumes without repeating completed work.
+
+- **Journal replay.** Every LLM and tool call runs inside `ctx.run` with a stable, deterministic step
+  key (`planner`, `synthesizer`, `llm:<n>`, `tool:<n>:<k>`). On resume, completed steps are replayed
+  from Restate's journal — not re-issued — so no finished LLM call or web search runs twice.
+- **Long calls aren't killed.** The `session` object and `investigator` service raise Restate's
+  inactivity/abort timeouts (`RESTATE_INACTIVITY_TIMEOUT_MS` / `RESTATE_ABORT_TIMEOUT_MS`) above the
+  longest expected LLM call, while the OpenAI client uses a shorter per-request timeout
+  (`OPENAI_TIMEOUT_MS`) and delegates retries to Restate (`OPENAI_MAX_RETRIES=0`), so a hung call
+  fails fast and is retried durably by `ctx.run`.
+
+The one uncovered edge is the millisecond window where a crash lands after an API call returns but
+before its result is journaled — that single call would be re-issued on resume. Closing it with
+per-call idempotency keys (plus a client action key for duplicate sends) is deferred as low-payoff for
+this POC; see [`docs/decisions.md`](docs/decisions.md).
+
+### Kill / restart demo
+
+```bash
+# 1) start a session and send a research turn
+npm run cli start                       # -> <sessionId>
+npm run cli turn <sessionId> "Compare Datadog and Snowflake over the last three years"
+
+# 2) while it is running, kill the service (Ctrl-C in the `npm run dev` terminal), then restart it
+npm run dev                             # same port; Restate redelivers the in-flight invocation
+
+# 3) the turn resumes to completion. Inspect the journal at http://localhost:9070 — completed
+#    LLM/tool steps appear as replayed, not re-executed.
+```
+
 ## Project layout
 
 ```
@@ -120,7 +155,9 @@ Configuration is via environment variables (see [`.env.example`](.env.example)).
 `_SYNTHESIZER`), the breadth cap (`MAX_SUBQUESTIONS`, default 5), and the tool bounds
 (`WEB_SEARCH_MAX_RESULTS`, `FETCH_PAGE_MAX_CHARS`, `MAX_TOOL_TURNS`, `MAX_SOURCES`) are read at
 runtime. `MAX_CONCURRENCY` (default 3) bounds how many investigators run at once. `PORT` (default
-`9080`) sets the service endpoint. The freshness knob is used from Phase 7+.
+`9080`) sets the service endpoint. The durability knobs (`OPENAI_TIMEOUT_MS`, `OPENAI_MAX_RETRIES`,
+`RESTATE_INACTIVITY_TIMEOUT_MS`, `RESTATE_ABORT_TIMEOUT_MS`) are covered in "Durability &
+crash-resume". The freshness knob is used from Phase 7+.
 
 ## Continuous integration
 

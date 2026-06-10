@@ -108,17 +108,21 @@ independently verifiable, and ends in a runnable state.
 ## Phase 6 — Durability & crash-resume hardening
 
 > Goal: prove resume-without-repeat and idempotent external effects. (NFR1, NFR3)
+>
+> Scope note: shipped the long-call timeout hardening; the idempotency-key and client action-key items
+> were deferred as low-payoff for this POC — journal replay already prevents repeating completed work.
+> See `docs/decisions.md` ("Scoped out").
 
-- [ ] Client action-key idempotency on `sendTurn`; deterministic per-step keys via `ctx.rand`.
-- [ ] Pass the OpenAI `Idempotency-Key` for the in-flight-at-crash window.
-- [ ] Configure inactivity/abort timeouts for long LLM calls.
-- [ ] **Security:** verify retries/resumes never duplicate external effects (NFR3).
-- [ ] **Docs:** document the durability story and the kill/restart procedure.
+- [ ] Client action-key idempotency on `sendTurn`; deterministic per-step keys via `ctx.rand`. _(Deferred.)_
+- [ ] Pass the OpenAI `Idempotency-Key` for the in-flight-at-crash window. _(Deferred.)_
+- [x] Configure inactivity/abort timeouts for long LLM calls.
+- [x] **Security:** verify retries/resumes never duplicate external effects (NFR3). _(Journal replay covers completed steps; the in-flight-window dedup is deferred.)_
+- [x] **Docs:** document the durability story and the kill/restart procedure.
 
 **Acceptance criteria**
 - [ ] Killing the server mid-research and restarting resumes the turn to completion.
 - [ ] No completed LLM call or web search is repeated on resume (verified in journal/logs).
-- [ ] A duplicate `sendTurn` with the same idempotency key does not start a second turn.
+- [ ] A duplicate `sendTurn` with the same idempotency key does not start a second turn. _(Deferred with the idempotency work.)_
 
 ## Phase 7 — Refinement + result reuse
 

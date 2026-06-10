@@ -153,7 +153,9 @@ the running conversation), any `function_call`s to execute, the final text, and 
 
 The client ([`src/llm/client.ts`](../src/llm/client.ts)) is created lazily inside `ctx.run`, so a
 missing `OPENAI_API_KEY` surfaces as a terminal error on the turn (not at startup) and `npm run check`
-needs no key.
+needs no key. It is configured with a per-request `timeout` (`OPENAI_TIMEOUT_MS`, default 120s) and
+`maxRetries` (`OPENAI_MAX_RETRIES`, default 0), so `ctx.run` is the single durable retry authority and
+a hung call fails fast (below the Restate inactivity timeout) and is retried durably.
 
 ## Step-name convention
 

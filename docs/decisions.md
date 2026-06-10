@@ -382,9 +382,50 @@ that references it).
 - **Alternatives:** Run investigations in-process within the Session invocation; a streaming semaphore
   pool instead of batching; LLM-chosen concurrency.
 - **Rationale / trade-offs:** A service per investigation gives each its own invocation/journal (true,
-  observable parallelism) and fulfils the Phase-0 "stateless Service investigators" decision. Batching
+  observable parallelism) and fulfils the Phase-0 "stateless Service investigators" decision.   Batching
   is the pattern Restate documents and matches the TODO; the trade-offs are batch-granular progress (a
   batch flips to running together) and a barrier between batches, both fine at this scale. Server-side
   bounds protect OpenAI/Tavily rate limits and cost.
+- **Made by:** Human+Agent
+- **Date:** 2026-06-10
+
+## Phase 6 — Durability & crash-resume hardening
+
+### Inactivity/abort timeouts on the Session object + Investigator service
+- **Decision:** Set `inactivityTimeout` (default 300s, `RESTATE_INACTIVITY_TIMEOUT_MS`) and
+  `abortTimeout` (default 60s, `RESTATE_ABORT_TIMEOUT_MS`) via the SDK `options` block on the
+  `session` object and `investigator` service; env is read inline per file (matching the codebase's
+  per-file env convention, no shared config module). The OpenAI client also sets a per-request
+  `timeout` (`OPENAI_TIMEOUT_MS`, default 120s) kept below the inactivity timeout, and `maxRetries: 0`
+  (`OPENAI_MAX_RETRIES`) so `ctx.run` is the single durable retry authority.
+- **Alternatives:** Configure timeouts only at the Restate server level; a shared config module;
+  per-handler overrides; keep the OpenAI SDK's default 2 in-process retries.
+- **Rationale / trade-offs:** A long LLM `ctx.run` makes no journal progress while in flight, so the
+  default 1-minute inactivity timeout would treat a multi-minute call as stuck and abort/retry it —
+  the one change in this phase that prevents a real failure on long turns. Raising it above the
+  longest expected call (with the OpenAI per-request timeout below it) lets a hung call fail fast and
+  retry durably without Restate force-aborting a healthy one. SDK-level `options` keep the knob beside
+  the code but are sent during discovery, so they require restate-server >= 1.4 (documented in the
+  README). A shared module was rejected as disproportionate for two consumers reading two vars.
+- **Made by:** Human+Agent
+- **Date:** 2026-06-10
+
+### Scoped out (deferred): OpenAI `Idempotency-Key` + client action key
+- **Decision:** Do **not** ship the deterministic OpenAI `Idempotency-Key` (per-step `ctx.rand` key)
+  or the client action key on `sendTurn` (the `--turn-id` flag) in this phase; keep only the
+  timeout/retry hardening above. Supersedes the originally-planned idempotency entries (which were
+  drafted and verified working — a duplicate send returned `PreviouslyAccepted` — then reverted). This
+  defers mechanisms (a) client action key and (c) OpenAI `Idempotency-Key` from the Phase-0
+  "idempotency vs result reuse" decision; semantic result reuse (b) remains Phase 7.
+- **Alternatives:** Implement both now, as the original Phase 6 plan specified.
+- **Rationale / trade-offs:** Journal replay already makes crash-resume skip completed LLM/tool calls
+  — that property holds from Phases 3-5. The OpenAI key only protects a millisecond window (a crash
+  after the API returns but before its result is journaled), and the client action key only matters
+  for a *retrying* client (the CLI mints a fresh turn id per send, so duplicates can't occur unless
+  deliberately forced). For a learning POC the payoff did not justify the extra surface and the
+  determinism reasoning (diminishing returns). Accepted gap: a single in-flight call could be
+  re-issued on resume in that narrow window, and a deliberately-duplicated send would start a second
+  turn — so NFR3 is now "completed steps never repeat (journal replay)" rather than a strict "never
+  duplicate external effects". Cheap to add back later, since the wrapper is the single LLM chokepoint.
 - **Made by:** Human+Agent
 - **Date:** 2026-06-10
