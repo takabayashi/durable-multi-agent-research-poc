@@ -71,7 +71,16 @@ export function extractReadable(html: string, url: string): { title: string; tex
 
 /** Durable-step body (wrapped in ctx.run by the investigator). */
 export async function fetchPage(args: FetchPageArgs): Promise<PageContent> {
-  const res = await fetch(args.url, { signal: AbortSignal.timeout(20_000), redirect: "follow" });
+  let res: Response;
+  try {
+    res = await fetch(args.url, { signal: AbortSignal.timeout(20_000), redirect: "follow" });
+  } catch (err) {
+    // Network-level failure (DNS/TLS/connection reset, or the 20s timeout abort).
+    // Degrade gracefully like the !res.ok path below rather than throwing, which would
+    // propagate to ctx.run and trigger Restate retries for a likely-permanent error.
+    const reason = err instanceof Error ? err.message : String(err);
+    return { title: args.url, url: args.url, text: `(failed to fetch page: ${reason})` };
+  }
   if (!res.ok) {
     // Degrade gracefully: report the failure to the model rather than throwing
     // (which would trigger ctx.run retries for a likely-permanent error).
