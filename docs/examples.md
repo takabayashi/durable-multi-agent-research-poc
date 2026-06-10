@@ -1,9 +1,11 @@
 # Example queries
 
-Queries used for demos and (later) integration tests. In Phase 2 the research is mocked
-([`../src/mock/research.ts`](../src/mock/research.ts)): the canonical query and short definitional
-questions get tailored responses; everything else gets a generic three-part decomposition. Drive
-them with the CLI (see the README): `npm run cli turn <sessionId> "<query>"`.
+Queries used for demos and (later) integration tests. From Phase 3 the planner and synthesizer are
+real LLM calls (see [`prompts.md`](./prompts.md)); the planner decides decomposition vs. an immediate
+answer. Per-sub-question investigation is stubbed
+([`../src/agents/investigation.ts`](../src/agents/investigation.ts)) until Phase 4, so sources are
+placeholders. Drive them with the CLI (see the README): `npm run cli turn <sessionId> "<query>"`
+(needs `OPENAI_API_KEY`).
 
 - **Q1 (canonical):** "Compare the performance of Datadog and Snowflake over the last three years -
   revenue, profit, margins, NRR - and analyze trends and developments."
@@ -18,4 +20,4 @@ them with the CLI (see the README): `npm run cli turn <sessionId> "<query>"`.
 - **Q6 (refinement of Q1):** "Go deeper on point 3 (margins): split gross vs operating."
   Supersession pair for Q1: "Ignore Snowflake - compare Datadog with Cloudflare instead."
 
-Refinement (Q6) and supersession land in later phases; in Phase 2 each turn is independent.
+Refinement (Q6) and supersession land in later phases; for now each turn is independent.

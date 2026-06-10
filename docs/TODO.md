@@ -63,17 +63,17 @@ independently verifiable, and ends in a runnable state.
 
 > Goal: real decomposition and cited synthesis; investigator results still stubbed.
 
-- [ ] Add an LLM wrapper around the `openai` SDK that runs inside `ctx.run`, **returns token usage (incl. model)**, and emits Tier-1 structured logs with stable step names. (FR2)
-- [ ] Planner: decompose a question into sub-questions (bounded breadth), or answer immediately for trivial questions. (FR2)
-- [ ] Synthesizer: combine stubbed sub-results into a structured answer with citations. (FR4)
-- [ ] Disable native parallel tool-calls; set deterministic step naming conventions.
-- [ ] **Security:** treat model output as data; never log secrets; truncate logged prompts/responses.
-- [ ] **Docs:** document the planner/synthesizer prompts and the LLM-wrapper contract.
+- [x] Add an LLM wrapper around the `openai` SDK that runs inside `ctx.run`, **returns token usage (incl. model)**, and emits Tier-1 structured logs with stable step names. (FR2)
+- [x] Planner: decompose a question into sub-questions (bounded breadth), or answer immediately for trivial questions. (FR2)
+- [x] Synthesizer: combine stubbed sub-results into a structured answer with citations. (FR4)
+- [x] Disable native parallel tool-calls; set deterministic step naming conventions.
+- [x] **Security:** treat model output as data; never log secrets; truncate logged prompts/responses.
+- [x] **Docs:** document the planner/synthesizer prompts and the LLM-wrapper contract.
 
 **Acceptance criteria**
-- [ ] A complex question produces a sensible list of sub-questions; a trivial one is answered directly.
-- [ ] The synthesized answer includes citations referencing the (stubbed) sources.
-- [ ] Each LLM step appears once in the journal and carries token usage.
+- [x] A complex question produces a sensible list of sub-questions; a trivial one is answered directly.
+- [x] The synthesized answer includes citations referencing the (stubbed) sources.
+- [x] Each LLM step appears once in the journal and carries token usage.
 
 ## Phase 4 — Tools: `web_search` + `fetch_page`
 

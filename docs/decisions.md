@@ -208,3 +208,74 @@ that references it).
 - **Rationale / trade-offs:** Three subcommands don't justify a dependency and it is trivial to extend.
 - **Made by:** Agent
 - **Date:** 2026-06-09
+
+## Phase 3 — Planner + synthesizer
+
+### LLM access: Responses API + Zod structured outputs
+- **Decision:** All model calls go through one durable wrapper (`callStructured`) using the OpenAI
+  Responses API with Zod structured outputs (`responses.parse` + `zodTextFormat`), wrapped in
+  `ctx.run`. `openai@6` + `zod@4` are compatible (the helper emits a draft-7 JSON schema for v4), so
+  no workaround was needed.
+- **Alternatives:** Chat Completions; free-text + manual JSON parsing.
+- **Rationale / trade-offs:** Type-safe, replay-friendly, and treats model output strictly as data;
+  one chokepoint to add idempotency keys / timeouts later (Phase 6). Slightly couples us to the
+  Responses API request/response shape.
+- **Made by:** Human+Agent
+- **Date:** 2026-06-10
+
+### Citations resolved server-side from source ids
+- **Decision:** The synthesizer returns `citedSourceIds` (e.g. `S1`), not URLs; we resolve them to
+  the real `Source` objects and drop unknown ids.
+- **Alternatives:** Let the model emit citation objects (title/url) directly.
+- **Rationale / trade-offs:** Makes fabricated/injected citations impossible — every citation
+  references a source we actually hold. Costs a tiny resolution step and a stable per-turn id scheme.
+- **Made by:** Human+Agent
+- **Date:** 2026-06-10
+
+### Prompts + schemas colocated per agent (sibling `*.prompt.ts`)
+- **Decision:** Each agent's pure module (`planner.prompt.ts` / `synthesizer.prompt.ts`) holds its
+  system text, input builder, Zod schema, and pure post-processing (`applyBreadthCap`,
+  `resolveCitations`); the durable `*.ts` stays thin orchestration. `src/llm/` is generic transport
+  only; the single shared helper is `asUntrustedBlock` in `format.ts`.
+- **Alternatives:** A shared `src/llm/prompts.ts` + `schemas.ts`.
+- **Rationale / trade-offs:** Each prompt has exactly one consumer, so colocation maximizes per-agent
+  cohesion and keeps unit tests pure, while preserving the Phase 0 pure/durable file split. Prompts
+  are no longer all in one place (accepted — they live beside their agent).
+- **Made by:** Human+Agent
+- **Date:** 2026-06-10
+
+### Live LLM by default; Phase-2 mock removed
+- **Decision:** `sendTurn` always runs the real planner/synthesizer; the `mockResearch` module is
+  deleted. A missing `OPENAI_API_KEY` raises a `TerminalError` on the turn; `npm run check` needs no
+  key (pure prompt/schema/stub unit tests cover CI).
+- **Alternatives:** Keep a mock fallback toggled by env / key presence.
+- **Rationale / trade-offs:** Keeps the "real LLM" story honest and the code branch-free; the
+  trade-off is that live demos require a key (CI does not).
+- **Made by:** Human+Agent
+- **Date:** 2026-06-10
+
+### Planner/synthesizer as in-handler durable steps
+- **Decision:** For Phase 3 the planner and synthesizer are plain functions invoked from `sendTurn`
+  (each one `ctx.run` step), not separate Restate Services; investigation is a stub.
+- **Alternatives:** Stand up the orchestrator + investigator Services now.
+- **Rationale / trade-offs:** Avoids premature abstraction; the orchestrator-worker fan-out and
+  stateless investigator Services arrive in Phase 5 when real parallelism is needed. A sequential
+  stub loop is enough until then.
+- **Made by:** Human+Agent
+- **Date:** 2026-06-10
+
+### Per-turn orchestrator extracted (refines "in-handler durable steps")
+- **Decision:** The plan -> investigate -> synthesize flow lives in a per-turn orchestrator function
+  (`runResearch`, [`src/agents/orchestrator.ts`](../src/agents/orchestrator.ts)) that reports progress
+  via a small `ResearchHooks` interface; `sendTurn` only owns durable state and wires the hooks. This
+  refines the entry above: the steps are still in-process (no new Restate Services), but the
+  sequencing is no longer inline in the handler.
+- **Alternatives:** Keep the flow inline in `sendTurn`; pass the mutable turn + `persist` into the
+  orchestrator (less indirection, looser state boundary); a stateful `Orchestrator` class.
+- **Rationale / trade-offs:** Separates "Session owns state" from "orchestrator owns flow" (cohesion),
+  makes `sendTurn` read as state management, and creates the exact seam Phase 5 fills with bounded
+  parallel fan-out. A function (not a class) avoids ceremony with no instance state; the hooks add one
+  layer of inversion-of-control indirection. Stateless investigator Services and `RestatePromise.all`
+  still arrive in Phase 5.
+- **Made by:** Human+Agent
+- **Date:** 2026-06-10

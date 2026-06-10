@@ -10,8 +10,9 @@ unnecessarily.
 See [`docs/requirements.md`](docs/requirements.md) for the full PRD, [`docs/TODO.md`](docs/TODO.md) for
 the phased build plan, and [`docs/decisions.md`](docs/decisions.md) for the decision log.
 
-> Status: **Phase 0** — project skeleton with a single durable "greeter" service that proves the
-> Restate wiring end-to-end. The research agents land in later phases (see the TODO).
+> Status: **Phase 3** — a turn runs a real LLM planner and synthesizer (each a durable step), with
+> per-sub-question investigation stubbed until Phase 4. See [`docs/prompts.md`](docs/prompts.md) for
+> the prompt/LLM-wrapper design and [`docs/TODO.md`](docs/TODO.md) for the roadmap.
 
 ## Prerequisites
 
@@ -24,7 +25,7 @@ the phased build plan, and [`docs/decisions.md`](docs/decisions.md) for the deci
 
 ```bash
 npm install
-cp .env.example .env   # fill in values; not needed for the Phase 0 greeter
+cp .env.example .env   # set OPENAI_API_KEY for live research turns (not needed for npm run check)
 ```
 
 ## Build & test
@@ -74,9 +75,12 @@ npm run cli turn <sessionId> "Compare Datadog and Snowflake over the last three 
 npm run cli progress <sessionId>
 ```
 
-In Phase 2 the research is mocked ([`src/mock/research.ts`](src/mock/research.ts); see
-[`docs/examples.md`](docs/examples.md)), but the durable Session object, observable progress, and
-CLI are real. Kill the service mid-turn and restart it - the turn resumes where it left off.
+Turns run a real planner and synthesizer (set `OPENAI_API_KEY` first); the per-sub-question
+investigation is stubbed until Phase 4, so citations point at placeholder sources. A complex query is
+decomposed into parallel-ready sub-questions; a trivial one (e.g. "What does NRR stand for?") is
+answered directly. The CLI prints the cited answer and a per-model token summary. See
+[`docs/prompts.md`](docs/prompts.md) and [`docs/examples.md`](docs/examples.md). Kill the service
+mid-turn and restart it - the turn resumes where it left off.
 
 ## Project layout
 
@@ -87,18 +91,27 @@ src/
   greeting.ts         # pure greeting logic (unit-tested)
   services/
     greeter.ts        # Phase 0 durable "greeter" service
+  llm/
+    client.ts         # lazy OpenAI client (reads OPENAI_API_KEY)
+    wrapper.ts        # callStructured: durable, structured-output LLM call (ctx.run)
+    format.ts         # shared prompt-formatting helpers (untrusted-data block, truncation)
+  agents/
+    orchestrator.ts   # per-turn flow: plan -> investigate -> synthesize (runResearch)
+    planner.ts        # durable plan(); planner.prompt.ts holds its prompt + schema
+    synthesizer.ts    # durable synthesize(); synthesizer.prompt.ts holds its prompt + schema
+    investigation.ts  # stubbed investigator (Phase 4 makes it a real tool loop)
   session/
     session.ts        # durable Session virtual object (start/sendTurn/getProgress/getResult)
     types.ts          # session / turn / progress types
-  mock/
-    research.ts       # deterministic mocked research (Phase 2 stand-in)
-docs/                 # PRD, TODO, traceability, decisions, examples
+docs/                 # PRD, TODO, traceability, decisions, examples, prompts
 ```
 
 ## Configuration
 
-Configuration is via environment variables (see [`.env.example`](.env.example)). The Phase 0 greeter
-only honours `PORT` (default `9080`); API keys and research settings are used from later phases.
+Configuration is via environment variables (see [`.env.example`](.env.example)). Live turns need
+`OPENAI_API_KEY`; the planner/synthesizer models (`OPENAI_MODEL_PLANNER` / `OPENAI_MODEL_SYNTHESIZER`)
+and the breadth cap (`MAX_SUBQUESTIONS`, default 5) are read at runtime. `PORT` (default `9080`) sets
+the service endpoint. `TAVILY_API_KEY` and the concurrency/freshness knobs are used from Phase 4+.
 
 ## Continuous integration
 
