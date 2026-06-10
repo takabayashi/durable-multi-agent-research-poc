@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Environment / secrets — never commit real keys
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# Test / coverage
+coverage/
+.nyc_output/
+
+# Local input documents (kept out of the repo)
+*.pdf
+
+# Restate local data (if generated during dev)
+restate-data/
+.restate/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+*.iml
+
+# Cursor local planning/scratch (rules are tracked; plans are not)
+.cursor/plans/
