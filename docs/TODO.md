@@ -47,17 +47,17 @@ independently verifiable, and ends in a runnable state.
 
 > Goal: durable multi-turn sessions with observable progress, using mocked answers and a CLI.
 
-- [ ] Implement the Session Virtual Object: `startSession`, `sendTurn`, and a `getProgress` shared (read-only) handler. (FR1, NFR2, NFR4)
-- [ ] Model session state: turn history, per-turn status, sub-question list (mocked).
-- [ ] Return a canned, cited answer from recorded fixtures for the canonical query.
-- [ ] Build the CLI (`@restatedev/restate-sdk-clients`): start session, send turn, poll progress.
-- [ ] **Security:** validate/normalize CLI input; reject malformed turns with a terminal error.
-- [ ] **Docs:** README "drive it with the CLI"; document the fixtures in `docs/examples.md`.
+- [x] Implement the Session Virtual Object: `startSession`, `sendTurn`, and a `getProgress` shared (read-only) handler. (FR1, NFR2, NFR4)
+- [x] Model session state: turn history, per-turn status, sub-question list (mocked).
+- [x] Return a canned, cited answer from recorded fixtures for the canonical query.
+- [x] Build the CLI (`@restatedev/restate-sdk-clients`): start session, send turn, poll progress.
+- [x] **Security:** validate/normalize CLI input; reject malformed turns with a terminal error.
+- [x] **Docs:** README "drive it with the CLI"; document the fixtures in `docs/examples.md`.
 
 **Acceptance criteria**
-- [ ] Two sessions run concurrently without their state interfering (NFR2).
-- [ ] `getProgress` reflects mocked sub-question statuses during a turn.
-- [ ] State survives a server restart (start a session, restart, session still resolves).
+- [x] Two sessions run concurrently without their state interfering (NFR2).
+- [x] `getProgress` reflects mocked sub-question statuses during a turn.
+- [x] State survives a server restart (start a session, restart, session still resolves).
 
 ## Phase 3 — Planner + synthesizer (real LLM, stubbed investigation)
 

@@ -59,16 +59,40 @@ curl localhost:8080/greeter/greet --json '{"name":"Ada"}'
 You can inspect the execution journal (every durable step) in the Restate UI at
 <http://localhost:9070>.
 
+## Drive it with the CLI
+
+With the service running and registered (see "Run locally"):
+
+```bash
+# create a session -> prints a session id
+npm run cli start
+
+# send a research turn, stream progress, then print the cited answer
+npm run cli turn <sessionId> "Compare Datadog and Snowflake over the last three years"
+
+# print current progress once
+npm run cli progress <sessionId>
+```
+
+In Phase 2 the research is mocked ([`src/mock/research.ts`](src/mock/research.ts); see
+[`docs/examples.md`](docs/examples.md)), but the durable Session object, observable progress, and
+CLI are real. Kill the service mid-turn and restart it - the turn resumes where it left off.
+
 ## Project layout
 
 ```
 src/
   app.ts              # endpoint entrypoint: binds services, listens on :9080
+  cli.ts              # CLI client (start / turn / progress)
   greeting.ts         # pure greeting logic (unit-tested)
-  greeting.test.ts    # Vitest unit test
   services/
     greeter.ts        # Phase 0 durable "greeter" service
-docs/                 # PRD, TODO, traceability, decisions
+  session/
+    session.ts        # durable Session virtual object (start/sendTurn/getProgress/getResult)
+    types.ts          # session / turn / progress types
+  mock/
+    research.ts       # deterministic mocked research (Phase 2 stand-in)
+docs/                 # PRD, TODO, traceability, decisions, examples
 ```
 
 ## Configuration

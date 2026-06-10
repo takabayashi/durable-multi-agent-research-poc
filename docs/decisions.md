@@ -178,3 +178,33 @@ that references it).
 - **Rationale / trade-offs:** Covers direct pushes and PRs; a single Node version matches the dev/runtime target and keeps CI fast. Matrix deferred (one supported runtime for the POC).
 - **Made by:** Agent
 - **Date:** 2026-06-09
+
+## Phase 2 — Session model & CLI
+
+### Session lifecycle: client-generated id + `start`
+- **Decision:** The CLI generates a UUID and calls `Session(id).start()`, which initializes state and echoes the id; `sendTurn` also auto-creates state on first call. The Session is a keyed virtual object.
+- **Alternatives:** A separate factory service that generates and returns ids.
+- **Rationale / trade-offs:** Fewer moving parts and naturally idempotent (the client owns the key); a factory is cleaner conceptually but adds a component. Easy to switch later.
+- **Made by:** Human+Agent
+- **Date:** 2026-06-09
+
+### Turn interaction: one-way sendTurn + poll getProgress
+- **Decision:** Clients invoke `sendTurn` one-way and poll the read-only shared `getProgress` until done, then read `getResult`.
+- **Alternatives:** A blocking request-response that returns the final answer.
+- **Rationale / trade-offs:** Matches a long-running, observable turn (NFR4): the exclusive `sendTurn` runs while shared reads stay concurrent; polling is simple and demo-friendly. SSE/streaming deferred.
+- **Made by:** Human+Agent
+- **Date:** 2026-06-09
+
+### Mocked progress via durable ctx.sleep
+- **Decision:** `sendTurn` advances each sub-question pending -> running -> done with `ctx.sleep(MOCK_STEP_MS)` between steps; the canned, cited answer comes from a pure `mockResearch` module.
+- **Alternatives:** Resolve the whole turn instantly.
+- **Rationale / trade-offs:** Durable sleeps make intermediate statuses observable and let the turn resume mid-flight after a restart (verified) — exercising FR1/NFR1/NFR4 before any real LLM. The pure mock stays unit-testable.
+- **Made by:** Agent
+- **Date:** 2026-06-09
+
+### CLI: hand-rolled argv
+- **Decision:** A small argv-based CLI (`start` / `turn` / `progress`) over `@restatedev/restate-sdk-clients`; no CLI framework dependency.
+- **Alternatives:** commander / yargs.
+- **Rationale / trade-offs:** Three subcommands don't justify a dependency and it is trivial to extend.
+- **Made by:** Agent
+- **Date:** 2026-06-09
