@@ -37,3 +37,4 @@ Thumbs.db
 
 # Cursor local files (rules, plans) are kept local, not tracked
 .cursor/
+models.json
