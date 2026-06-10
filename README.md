@@ -75,3 +75,35 @@ docs/                 # PRD, TODO, traceability, decisions
 
 Configuration is via environment variables (see [`.env.example`](.env.example)). The Phase 0 greeter
 only honours `PORT` (default `9080`); API keys and research settings are used from later phases.
+
+## Continuous integration
+
+GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs on every push and pull
+request: lint + format check (Biome), typecheck, build, tests, a gitleaks secret scan, and a Docker
+build with a startup smoke test. Local equivalents:
+
+```bash
+npm run lint        # Biome: lint + format + import-order check
+npm run format      # Biome: auto-fix
+npm run typecheck   # tsc --noEmit
+npm run build
+npm test
+```
+
+## Build the container
+
+```bash
+docker build -t durable-research .
+docker run --rm -p 9080:9080 durable-research
+# expect: "Restate SDK started listening on 9080..."
+```
+
+The image is multi-stage (build then a slim runtime), runs as a non-root user, and exposes `9080`.
+Register it with a running Restate server exactly as in "Run locally".
+
+## Rotating keys
+
+Secrets live only in `.env` (gitignored); the repo ships `.env.example` placeholders, and CI runs
+gitleaks to catch accidental commits. To rotate a key: revoke/replace `OPENAI_API_KEY` /
+`TAVILY_API_KEY` at the provider, update your local `.env`, and restart the service. If a key is ever
+committed, rotate it immediately — repository history is public.

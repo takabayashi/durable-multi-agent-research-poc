@@ -32,17 +32,17 @@ independently verifiable, and ends in a runnable state.
 
 > Goal: every push is linted, type-checked, built, tested, and scanned; the service is containerized.
 
-- [ ] GitHub Actions workflow: install, typecheck, lint, build, test.
-- [ ] Add a secret-scanning step (e.g. gitleaks) to the workflow.
-- [ ] Add a `Dockerfile` that builds and runs the service; verify it builds in CI.
-- [ ] Add lint/format config (ESLint + Prettier or Biome).
-- [ ] **Security:** secret-scan runs on every PR; document how to rotate keys.
-- [ ] **Docs:** README "CI" + "build the container" sections.
+- [x] GitHub Actions workflow: install, typecheck, lint, build, test.
+- [x] Add a secret-scanning step (e.g. gitleaks) to the workflow.
+- [x] Add a `Dockerfile` that builds and runs the service; verify it builds in CI.
+- [x] Add lint/format config (ESLint + Prettier or Biome).
+- [x] **Security:** secret-scan runs on every PR; document how to rotate keys.
+- [x] **Docs:** README "CI" + "build the container" sections.
 
 **Acceptance criteria**
 - [ ] CI is green on a clean checkout.
-- [ ] `docker build` succeeds and the container starts the service.
-- [ ] The secret-scan step fails the build if a fake secret is introduced (spot-checked).
+- [x] `docker build` succeeds and the container starts the service.
+- [x] The secret-scan step fails the build if a fake secret is introduced (spot-checked).
 
 ## Phase 2 — Session model + CLI (mocked turns)
 

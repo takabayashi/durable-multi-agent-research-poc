@@ -131,3 +131,50 @@ that references it).
   handler stays a thin durable wrapper — the pattern the agent loop reuses in later phases.
 - **Made by:** Agent
 - **Date:** 2026-06-09
+
+### Model selection per role: cost-optimized, floating aliases
+- **Decision:** Planner `gpt-5.4-nano`, investigator `gpt-5.4-mini`, synthesizer `gpt-5.4` (via
+  `OPENAI_MODEL_PLANNER` / `_INVESTIGATOR` / `_SYNTHESIZER`), using floating aliases rather than dated
+  snapshots.
+- **Alternatives:** Balanced (`gpt-5.4-mini` / `gpt-5.4-mini` / `gpt-5.5`) and max-quality (`gpt-5.5` /
+  `gpt-5.5` / `gpt-5.5-pro`) tiers; pinned dated snapshots; and special-purpose families — `*-codex`,
+  `*-search-preview` / `gpt-5-search-api`, `*-deep-research`, `*-chat-latest` — all rejected as
+  wrong-fit for hand-rolled tool-calling roles.
+- **Rationale / trade-offs:** Cost-first for a POC. The planner is one structured call (nano suffices);
+  investigators fan out in parallel multi-step ReAct loops, so `mini` keeps reliable function-calling at
+  low cost (nano is risky for multi-tool loops); the synthesizer is the single quality-critical step, so
+  full `gpt-5.4` sits above the investigator yet stays cheaper than `gpt-5.5` / `pro`. Aliases keep env
+  churn low and auto-track the latest snapshot; we give up snapshot reproducibility — replay determinism
+  is unaffected since Restate journals each call's output.
+- **Made by:** Human+Agent
+- **Date:** 2026-06-09
+
+## Phase 1 — CI/CD & container
+
+### Lint/format: Biome over ESLint + Prettier
+- **Decision:** Use Biome 2.x as the single lint + format + import-organize tool; `biome ci` in CI, `biome check --write` locally.
+- **Alternatives:** ESLint + Prettier (two tools plus plugins).
+- **Rationale / trade-offs:** One fast binary, near-zero config, fewer moving parts for a focused POC. Less plugin breadth than ESLint, acceptable here.
+- **Made by:** Human+Agent
+- **Date:** 2026-06-09
+
+### Secret scanning: gitleaks GitHub Action
+- **Decision:** Run `gitleaks/gitleaks-action@v2` on push/PR; no `GITLEAKS_LICENSE` (not required for a personal-account repo).
+- **Alternatives:** trufflehog; GitHub native secret scanning.
+- **Rationale / trade-offs:** Simple, free for this account type; scans history + working tree and fails the build on findings.
+- **Made by:** Agent
+- **Date:** 2026-06-09
+
+### Containerization: multi-stage Docker on node:22-slim, non-root
+- **Decision:** Two-stage build (full deps + `tsc`, then prod-only deps + `dist`), run as the non-root `node` user, expose 9080.
+- **Alternatives:** single-stage image; alpine base; distroless.
+- **Rationale / trade-offs:** Smaller, cleaner runtime without dev deps/build tools; slim (glibc) avoids alpine/musl surprises. Distroless deferred (harder to debug for a POC).
+- **Made by:** Agent
+- **Date:** 2026-06-09
+
+### CI triggers + Node version
+- **Decision:** Run CI on `push` and `pull_request`; Node 22 with npm cache.
+- **Alternatives:** push-only; a Node version matrix.
+- **Rationale / trade-offs:** Covers direct pushes and PRs; a single Node version matches the dev/runtime target and keeps CI fast. Matrix deferred (one supported runtime for the POC).
+- **Made by:** Agent
+- **Date:** 2026-06-09
