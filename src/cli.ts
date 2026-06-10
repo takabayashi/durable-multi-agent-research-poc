@@ -52,8 +52,23 @@ async function cmdTurn(sessionId: string, message: string): Promise<void> {
     if (result.answer.citations.length > 0) {
       console.log("\nSources:");
       for (const c of result.answer.citations) {
-        console.log(`  - ${c.title} (${c.url})`);
+        console.log(`  - [${c.id}] ${c.title} (${c.url})`);
       }
+    }
+  }
+
+  if (result?.usage && result.usage.length > 0) {
+    const byModel = new Map<string, { input: number; cached: number; output: number }>();
+    for (const u of result.usage) {
+      const agg = byModel.get(u.model) ?? { input: 0, cached: 0, output: 0 };
+      agg.input += u.inputTokens;
+      agg.cached += u.cachedTokens;
+      agg.output += u.outputTokens;
+      byModel.set(u.model, agg);
+    }
+    console.log("\nTokens (this turn):");
+    for (const [model, t] of byModel) {
+      console.log(`  - ${model}: in=${t.input} cached=${t.cached} out=${t.output}`);
     }
   }
 }

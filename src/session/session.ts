@@ -1,8 +1,6 @@
 import * as restate from "@restatedev/restate-sdk";
-import { mockResearch } from "../mock/research.js";
-import type { Progress, Turn } from "./types.js";
-
-const MOCK_STEP_MS = Number(process.env.MOCK_STEP_MS ?? 800);
+import { runResearch } from "../agents/orchestrator.js";
+import type { Progress, TokenUsage, Turn } from "./types.js";
 
 interface SendTurnInput {
   message: string;
@@ -17,8 +15,13 @@ async function loadTurns(
 /**
  * A research session, keyed by session id. Restate's single-writer guarantee
  * gives per-session isolation; its durable state persists turns across restarts.
- * Turns are mocked in Phase 2 (see mockResearch); the durable ctx.sleep loop
- * makes per-sub-question progress observable and resumable.
+ *
+ * In Phase 3 a turn delegates the plan -> investigate -> synthesize flow to the
+ * per-turn orchestrator (runResearch); the planner and synthesizer are real LLM
+ * steps wrapped in ctx.run (completed calls replay, not re-issue, on resume),
+ * while per-sub-question investigation is still stubbed until Phase 4. The Session
+ * owns durable state: it persists progress via the orchestrator's hooks between
+ * steps, keeping getProgress observable and letting a turn resume mid-flight.
  */
 export const session = restate.object({
   name: "session",
@@ -44,17 +47,15 @@ export const session = restate.object({
       }
 
       const turnId = ctx.rand.uuidv4();
-      const mock = mockResearch(message);
+      const usage: TokenUsage[] = [];
       const turn: Turn = {
         turnId,
         message,
-        status: mock.subQuestions.length === 0 ? "done" : "running",
-        subQuestions: mock.subQuestions.map((q) => ({ q, status: "pending" as const })),
+        status: "running",
+        subQuestions: [],
+        usage,
         createdAt: await ctx.date.now(),
       };
-      if (mock.subQuestions.length === 0) {
-        turn.answer = mock.answer;
-      }
 
       const turns = await loadTurns(ctx);
       const order = (await ctx.get<string[]>("order")) ?? [];
@@ -64,24 +65,45 @@ export const session = restate.object({
       ctx.set("order", order);
       ctx.set("currentTurnId", turnId);
 
-      // Advance each sub-question pending -> running -> done. The durable sleep
-      // makes intermediate statuses visible to getProgress and lets the turn
-      // resume mid-flight after a restart without redoing finished steps.
-      for (const sq of turn.subQuestions) {
-        sq.status = "running";
-        ctx.set("turns", turns);
-        await ctx.sleep(MOCK_STEP_MS);
-        sq.status = "done";
-        ctx.set("turns", turns);
-      }
+      const persist = () => ctx.set("turns", turns);
 
-      if (turn.subQuestions.length > 0) {
+      try {
+        // The orchestrator owns the plan -> investigate -> synthesize flow and
+        // reports progress through these hooks; the Session owns durable state.
+        turn.answer = await runResearch(ctx, message, {
+          onUsage: (u) => {
+            usage.push(u);
+            persist();
+          },
+          onSubQuestions: (questions) => {
+            turn.subQuestions = questions.map((q) => ({ q, status: "pending" as const }));
+            persist();
+          },
+          onInvestigationStart: (i) => {
+            const sq = turn.subQuestions[i];
+            if (sq) {
+              sq.status = "running";
+              persist();
+            }
+          },
+          onInvestigationDone: (i, result) => {
+            const sq = turn.subQuestions[i];
+            if (sq) {
+              sq.findings = result.findings;
+              sq.sources = result.sources;
+              sq.status = "done";
+              persist();
+            }
+          },
+        });
         turn.status = "done";
-        turn.answer = mock.answer;
-        ctx.set("turns", turns);
+        persist();
+        return { turnId };
+      } catch (err) {
+        turn.status = "failed";
+        persist();
+        throw err;
       }
-
-      return { turnId };
     },
 
     getProgress: restate.handlers.object.shared(
@@ -94,7 +116,7 @@ export const session = restate.object({
           status: turn?.status ?? "idle",
           currentTurnId,
           message: turn?.message ?? null,
-          subQuestions: turn?.subQuestions ?? [],
+          subQuestions: (turn?.subQuestions ?? []).map((sq) => ({ q: sq.q, status: sq.status })),
         };
       },
     ),
