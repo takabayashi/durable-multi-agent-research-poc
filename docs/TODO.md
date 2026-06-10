@@ -40,7 +40,7 @@ independently verifiable, and ends in a runnable state.
 - [x] **Docs:** README "CI" + "build the container" sections.
 
 **Acceptance criteria**
-- [ ] CI is green on a clean checkout.
+- [x] CI is green on a clean checkout.
 - [x] `docker build` succeeds and the container starts the service.
 - [x] The secret-scan step fails the build if a fake secret is introduced (spot-checked).
 
