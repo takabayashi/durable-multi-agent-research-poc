@@ -279,3 +279,64 @@ that references it).
   still arrive in Phase 5.
 - **Made by:** Human+Agent
 - **Date:** 2026-06-10
+
+## Phase 4 — Tools & investigator
+
+### Sources derived from executed tools, not model claims
+- **Decision:** The investigator returns free-text findings plus `sources` built from the URLs the
+  tools actually retrieved (web_search results + fetched pages), de-duped and id-tagged; the
+  synthesizer then selects which to cite.
+- **Alternatives:** Have the investigator emit a structured `{ findings, citedSourceIds }` like the
+  synthesizer.
+- **Rationale / trade-offs:** Consistent with Phase 3's "citations from real sources" — a source can
+  only exist if a tool returned it, so URLs cannot be fabricated. Slightly coarser (the investigator
+  doesn't pre-select citations), which the synthesizer already handles.
+- **Made by:** Human+Agent
+- **Date:** 2026-06-10
+
+### Tooling: raw fetch for Tavily; `@mozilla/readability` + `linkedom` for page text
+- **Decision:** `web_search` calls the Tavily REST API with raw `fetch` (no SDK); `fetch_page`
+  extracts main-content text with `@mozilla/readability` over a `linkedom` DOM (body fallback),
+  bounded + truncated.
+- **Alternatives:** Tavily SDK; `readdown` (single-dep, LLM-Markdown); `html-to-text`; `jsdom`.
+- **Rationale / trade-offs:** Matches the "raw SDK, minimal deps" stance and stays deterministic +
+  unit-testable. `readdown` rejected as too new/unproven (v0.2.x, ~2 stars, github/jsr-only) for a
+  public repo; `html-to-text` keeps nav/ad boilerplate; `linkedom` is lighter than `jsdom`.
+- **Made by:** Human+Agent
+- **Date:** 2026-06-10
+
+### Investigator owns its durable steps; deterministic ReAct loop
+- **Decision:** The investigator is not wrapped in a single `ctx.run` (no nesting allowed); it issues
+  a sequence of `ctx.run` steps with stable keys (`investigate:i:llm:n`, `investigate:i:tool:n:k`).
+  `parallel_tool_calls: false` => one tool per turn. After `MAX_TOOL_TURNS` it makes one tool-free
+  summary call (graceful degradation), and `fetch_page` reports HTTP failures to the model instead of
+  throwing.
+- **Alternatives:** A single mega-step; native parallel tool calls; failing the turn on any tool error.
+- **Rationale / trade-offs:** Stable keys give crash-resume replay with no duplicate external calls
+  (FR6/NFR3); one-tool-per-turn keeps the loop simple and deterministic; degradation keeps a flaky
+  page from sinking the whole turn.
+- **Made by:** Human+Agent
+- **Date:** 2026-06-10
+
+### Source dedup by light-normalized URL; `registry.ts` naming
+- **Decision:** `collectSources` de-dupes by a light-normalized URL (`normalizeUrl`: lowercase host,
+  strip fragment/trailing slash, drop tracking params); the first-seen URL keeps its id `S{i+1}-{k}`
+  (citation stability), a richer title upgrades a URL-fallback title, invalid URLs are dropped, and
+  the list is capped at `MAX_SOURCES`. The tool dispatcher file is `registry.ts`, not `index.ts`.
+- **Alternatives:** Raw-string URL equality; aggressive normalization (strip www, force https, sort
+  query); a bare `index.ts` barrel.
+- **Rationale / trade-offs:** Light normalization catches common dupes (trailing slash, utm) while
+  keeping genuinely distinct pages (e.g. `?page=2`) distinct; aggressive normalization risks merging
+  them. `registry.ts` names the responsibility (TOOL_DEFS + runTool) more clearly than `index.ts`.
+- **Made by:** Human+Agent
+- **Date:** 2026-06-10
+
+### Per-turn tool-call counts surfaced in state + CLI
+- **Decision:** The `Turn` records `toolCalls: Record<string, number>` (e.g. `{ web_search: 2,
+  fetch_page: 3 }`), aggregated across the turn's investigations via an `onToolCall` hook and printed
+  by the CLI. Per-call detail (args/results) stays in the Restate journal.
+- **Alternatives:** Nothing in state (journal only); a full per-turn `TraceEvent[]` now.
+- **Rationale / trade-offs:** Cheap, replay-safe visibility into tool activity without state bloat; the
+  full queryable trace (`getTrace`) remains a Phase 10 deliverable.
+- **Made by:** Human+Agent
+- **Date:** 2026-06-10

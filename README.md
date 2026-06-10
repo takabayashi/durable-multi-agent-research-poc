@@ -10,9 +10,10 @@ unnecessarily.
 See [`docs/requirements.md`](docs/requirements.md) for the full PRD, [`docs/TODO.md`](docs/TODO.md) for
 the phased build plan, and [`docs/decisions.md`](docs/decisions.md) for the decision log.
 
-> Status: **Phase 3** — a turn runs a real LLM planner and synthesizer (each a durable step), with
-> per-sub-question investigation stubbed until Phase 4. See [`docs/prompts.md`](docs/prompts.md) for
-> the prompt/LLM-wrapper design and [`docs/TODO.md`](docs/TODO.md) for the roadmap.
+> Status: **Phase 4** — a turn runs a real planner and synthesizer, and each sub-question is
+> investigated by a real ReAct loop over `web_search` (Tavily) + `fetch_page` durable tools. See
+> [`docs/prompts.md`](docs/prompts.md) for the prompt/tool/LLM-wrapper design and
+> [`docs/TODO.md`](docs/TODO.md) for the roadmap.
 
 ## Prerequisites
 
@@ -25,7 +26,7 @@ the phased build plan, and [`docs/decisions.md`](docs/decisions.md) for the deci
 
 ```bash
 npm install
-cp .env.example .env   # set OPENAI_API_KEY for live research turns (not needed for npm run check)
+cp .env.example .env   # set OPENAI_API_KEY + TAVILY_API_KEY for live turns (not needed for npm run check)
 ```
 
 ## Build & test
@@ -75,12 +76,13 @@ npm run cli turn <sessionId> "Compare Datadog and Snowflake over the last three 
 npm run cli progress <sessionId>
 ```
 
-Turns run a real planner and synthesizer (set `OPENAI_API_KEY` first); the per-sub-question
-investigation is stubbed until Phase 4, so citations point at placeholder sources. A complex query is
-decomposed into parallel-ready sub-questions; a trivial one (e.g. "What does NRR stand for?") is
-answered directly. The CLI prints the cited answer and a per-model token summary. See
+Turns run real LLM agents (set `OPENAI_API_KEY` + `TAVILY_API_KEY` first): the planner decomposes the
+question, each sub-question is investigated by a ReAct loop over `web_search` + `fetch_page`, and the
+synthesizer writes a cited answer from the real sources. A trivial query (e.g. "What does NRR stand
+for?") is answered directly. The CLI prints the cited answer, a per-model token summary, and a
+per-turn tool-call count. See
 [`docs/prompts.md`](docs/prompts.md) and [`docs/examples.md`](docs/examples.md). Kill the service
-mid-turn and restart it - the turn resumes where it left off.
+mid-turn and restart it - the turn resumes without repeating completed LLM or tool calls.
 
 ## Project layout
 
@@ -93,13 +95,18 @@ src/
     greeter.ts        # Phase 0 durable "greeter" service
   llm/
     client.ts         # lazy OpenAI client (reads OPENAI_API_KEY)
-    wrapper.ts        # callStructured: durable, structured-output LLM call (ctx.run)
+    wrapper.ts        # callStructured + callTools: durable LLM calls (ctx.run)
     format.ts         # shared prompt-formatting helpers (untrusted-data block, truncation)
+  tools/
+    search.ts         # web_search (Tavily) durable tool
+    fetch.ts          # fetch_page (readability + linkedom) durable tool
+    registry.ts       # TOOL_DEFS, runTool dispatch, collectSources
+    url.ts            # normalizeUrl for source dedup
   agents/
     orchestrator.ts   # per-turn flow: plan -> investigate -> synthesize (runResearch)
     planner.ts        # durable plan(); planner.prompt.ts holds its prompt + schema
+    investigator.ts   # durable ReAct loop; investigator.prompt.ts holds its prompt
     synthesizer.ts    # durable synthesize(); synthesizer.prompt.ts holds its prompt + schema
-    investigation.ts  # stubbed investigator (Phase 4 makes it a real tool loop)
   session/
     session.ts        # durable Session virtual object (start/sendTurn/getProgress/getResult)
     types.ts          # session / turn / progress types
@@ -109,9 +116,11 @@ docs/                 # PRD, TODO, traceability, decisions, examples, prompts
 ## Configuration
 
 Configuration is via environment variables (see [`.env.example`](.env.example)). Live turns need
-`OPENAI_API_KEY`; the planner/synthesizer models (`OPENAI_MODEL_PLANNER` / `OPENAI_MODEL_SYNTHESIZER`)
-and the breadth cap (`MAX_SUBQUESTIONS`, default 5) are read at runtime. `PORT` (default `9080`) sets
-the service endpoint. `TAVILY_API_KEY` and the concurrency/freshness knobs are used from Phase 4+.
+`OPENAI_API_KEY` and `TAVILY_API_KEY`; the per-role models (`OPENAI_MODEL_PLANNER` / `_INVESTIGATOR` /
+`_SYNTHESIZER`), the breadth cap (`MAX_SUBQUESTIONS`, default 5), and the tool bounds
+(`WEB_SEARCH_MAX_RESULTS`, `FETCH_PAGE_MAX_CHARS`, `MAX_TOOL_TURNS`, `MAX_SOURCES`) are read at
+runtime. `PORT` (default `9080`) sets the service endpoint. The concurrency/freshness knobs are used
+from Phase 5+.
 
 ## Continuous integration
 

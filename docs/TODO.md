@@ -79,16 +79,16 @@ independently verifiable, and ends in a runnable state.
 
 > Goal: real, durable, idempotent tools and a single end-to-end real investigator. (FR6)
 
-- [ ] Implement `web_search` (Tavily) and `fetch_page` as `ctx.run` durable steps with stable keys.
-- [ ] Implement an investigator ReAct loop (LLM ↔ tools) for one sub-question, producing a cited sub-result. (FR6)
-- [ ] Bound + truncate tool outputs before feeding them back to the model.
-- [ ] **Security:** treat fetched content as untrusted data (no instruction-following); cap sizes.
-- [ ] **Docs:** document the tool contracts and the investigator loop.
+- [x] Implement `web_search` (Tavily) and `fetch_page` as `ctx.run` durable steps with stable keys.
+- [x] Implement an investigator ReAct loop (LLM ↔ tools) for one sub-question, producing a cited sub-result. (FR6)
+- [x] Bound + truncate tool outputs before feeding them back to the model.
+- [x] **Security:** treat fetched content as untrusted data (no instruction-following); cap sizes.
+- [x] **Docs:** document the tool contracts and the investigator loop.
 
 **Acceptance criteria**
-- [ ] A single sub-question is investigated end-to-end against live Tavily + page fetches.
-- [ ] Re-running a completed tool step replays the journaled result (no second external call).
-- [ ] Sub-results carry source URLs used for citations.
+- [x] A single sub-question is investigated end-to-end against live Tavily + page fetches.
+- [x] Re-running a completed tool step replays the journaled result (no second external call).
+- [x] Sub-results carry source URLs used for citations.
 
 ## Phase 5 — Parallel investigation + bounded concurrency
 

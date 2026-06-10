@@ -1,11 +1,10 @@
 # Example queries
 
-Queries used for demos and (later) integration tests. From Phase 3 the planner and synthesizer are
-real LLM calls (see [`prompts.md`](./prompts.md)); the planner decides decomposition vs. an immediate
-answer. Per-sub-question investigation is stubbed
-([`../src/agents/investigation.ts`](../src/agents/investigation.ts)) until Phase 4, so sources are
-placeholders. Drive them with the CLI (see the README): `npm run cli turn <sessionId> "<query>"`
-(needs `OPENAI_API_KEY`).
+Queries used for demos and (later) integration tests. The planner and synthesizer are real LLM calls,
+and each sub-question is investigated by a real ReAct loop over `web_search` (Tavily) + `fetch_page`
+(see [`prompts.md`](./prompts.md)), so answers cite real sources. The planner still decides
+decomposition vs. an immediate answer. Drive them with the CLI (see the README):
+`npm run cli turn <sessionId> "<query>"` (needs `OPENAI_API_KEY` + `TAVILY_API_KEY`).
 
 - **Q1 (canonical):** "Compare the performance of Datadog and Snowflake over the last three years -
   revenue, profit, margins, NRR - and analyze trends and developments."
