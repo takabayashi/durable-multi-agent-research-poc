@@ -10,9 +10,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
-    "dev": "tsx watch src/app.ts",
-    "start": "node dist/app.js",
-    "cli": "tsx src/cli.ts",
+    "dev": "tsx watch --env-file-if-exists=.env src/app.ts",
+    "start": "node --env-file-if-exists=.env dist/app.js",
+    "cli": "tsx --env-file-if-exists=.env src/cli.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "biome check .",
@@ -23,7 +23,9 @@
   "license": "MIT",
   "dependencies": {
     "@restatedev/restate-sdk": "^1.14.5",
-    "@restatedev/restate-sdk-clients": "^1.14.5"
+    "@restatedev/restate-sdk-clients": "^1.14.5",
+    "openai": "^6.42.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.16",
