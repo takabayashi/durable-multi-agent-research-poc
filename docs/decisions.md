@@ -597,3 +597,21 @@ that references it).
   the reusable command cheat sheet + 30-second triage loop were preserved.
 - **Made by:** Human+Agent
 - **Date:** 2026-06-11
+
+## Phase 12 — Design note, README & final polish
+
+### Design note in the README; Phases 8 & 9 recorded as future work
+- **Decision:** Put the design write-up (agent topology + which Restate primitive delivers which
+  property + trade-offs + status/future-work) directly in the README rather than a separate document,
+  and wrap up the POC with **Phase 8 (cancellation/supersession + metrics)** and **Phase 9 (broader
+  automated test suite)** explicitly deferred as future work. Phase 11's live-minikube validation and
+  the fresh-clone repro pass remain pending (tracked, not yet ticked).
+- **Alternatives:** a standalone `docs/design.md`; building Phase 8 and 9 before wrapping up.
+- **Rationale / trade-offs:** for a POC the README is the single entry point a reviewer reads, so the
+  design note belongs there beside setup/run/deploy. Deferring 8/9 keeps the wrap-up honest (the note
+  describes what is actually built and clearly lists what isn't) and was a deliberate, time-boxed
+  scope call. Cost: the repo is "wrapped up" without cancellation, metrics, or an integration-test
+  suite — all cheap to add later behind the existing seams (the LLM wrapper, the orchestrator hooks,
+  and the single-writer turn handler).
+- **Made by:** Human+Agent
+- **Date:** 2026-06-11

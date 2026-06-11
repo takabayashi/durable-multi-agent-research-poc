@@ -146,6 +146,9 @@ independently verifiable, and ends in a runnable state.
 ## Phase 8 — Cancellation/supersession + metrics
 
 > Goal: handle contradicting turns and expose per-session token/tool metrics.
+>
+> Scope note: **deferred** — not built in this POC iteration; recorded as future work in the README
+> design note ("Status & future work"). See `docs/decisions.md` ("Phase 12").
 
 - [ ] Cancellation/supersession: a superseding turn cancels the in-flight invocation and marks the prior turn superseded.
 - [ ] Implement the `Metrics` object (tokens by model + tool-call counts) merged by the turn handler.
@@ -161,6 +164,10 @@ independently verifiable, and ends in a runnable state.
 ## Phase 9 — Automated tests
 
 > Goal: unit + integration coverage across representative queries and edge cases.
+>
+> Scope note: **deferred** — targeted unit tests exist for pure logic (prompts, tool wrappers, CLI
+> formatting, URL dedup), but the broader suite (testcontainers integration, edge-case matrix) is
+> future work. See the README design note ("Status & future work") and `docs/decisions.md` ("Phase 12").
 
 - [ ] Unit tests: planner decomposition, synthesizer citations, tool wrappers, metrics merge, reuse/freshness logic.
 - [ ] Integration tests with `@restatedev/restate-sdk-testcontainers` across the demo query set (Q1–Q6), including the immediate-answer and refinement branches.
@@ -214,12 +221,16 @@ independently verifiable, and ends in a runnable state.
 ## Phase 12 — Design note, README & final polish
 
 > Goal: a clear design write-up and a clean, reproducible repository.
+>
+> Scope note: design note + decision log shipped in this docs pass; **Phases 8 & 9 deferred** (future
+> work, see the README design note). The fresh-clone repro pass and the minikube end-to-end remain
+> pending Phase 11's live validation.
 
-- [ ] Design note (in the README): agent topology and why; which Restate primitives solve which property; trade-offs and future-work.
-- [ ] README end-to-end: setup, run, CLI demo (canonical query), durability demo, minikube.
-- [ ] Final repro pass: fresh-clone smoke test of the documented commands.
-- [ ] **Security:** final secret-scan + manual review of committed files before tagging.
-- [ ] **Docs:** ensure `docs/decisions.md` reflects all decisions to date.
+- [x] Design note (in the README): agent topology and why; which Restate primitives solve which property; trade-offs and future-work.
+- [ ] README end-to-end: setup, run, CLI demo (canonical query), durability demo, minikube. _(sections written; end-to-end verified after Phase 11 validation.)_
+- [ ] Final repro pass: fresh-clone smoke test of the documented commands. _(pending Phase 11 validation.)_
+- [ ] **Security:** final secret-scan + manual review of committed files before tagging. _(local scan clean: `.env` untracked + gitignored, no key-like strings in tracked files.)_
+- [x] **Docs:** ensure `docs/decisions.md` reflects all decisions to date.
 
 **Acceptance criteria**
 - [ ] A new reader can set up and run the demo from the README alone.
