@@ -10,13 +10,13 @@ unnecessarily.
 See [`docs/requirements.md`](docs/requirements.md) for the full PRD, [`docs/TODO.md`](docs/TODO.md) for
 the phased build plan, and [`docs/decisions.md`](docs/decisions.md) for the decision log.
 
-> Status: **Phase 7** — conversational refinement + context compaction. Follow-up turns reuse the
-> session's prior work: each turn feeds a journal of earlier turns to the planner/synthesizer, which
-> investigate only what's new and answer the rest from context. A compactor agent folds older turns
-> into a rolling summary once the journal outgrows a token budget. Earlier phases still apply (real
-> planner/synthesizer, parallel investigators, durability hardening). See
-> [`docs/prompts.md`](docs/prompts.md), "Refinement & reuse" / "Durability & crash-resume" below, and
-> [`docs/TODO.md`](docs/TODO.md) for the roadmap.
+> Status: **Phase 10** — observability & hardening. Each turn records a queryable Tier-2 trace
+> (`getTrace` / `npm run cli trace`) whose step names line up with the structured logs and the Restate
+> journal; a readiness handler complements the SDK's built-in liveness route. Earlier phases still
+> apply: conversational refinement + context compaction (follow-up turns reuse prior work via a
+> journal, folded into a rolling summary once it outgrows a token budget), real planner/synthesizer,
+> parallel investigators, and durability hardening. See "Observability" below,
+> [`docs/prompts.md`](docs/prompts.md), and [`docs/TODO.md`](docs/TODO.md) for the roadmap.
 
 ## Prerequisites
 
@@ -79,6 +79,12 @@ npm run cli turn <sessionId> "Compare Datadog and Snowflake over the last three 
 
 # print current progress once
 npm run cli progress <sessionId>
+
+# print a turn's trace transcript (defaults to the latest turn)
+npm run cli trace <sessionId> [turnId]
+
+# print service readiness (which dependencies are configured)
+npm run cli health
 ```
 
 Turns run real LLM agents (set `OPENAI_API_KEY` + `TAVILY_API_KEY` first): the planner decomposes the
@@ -145,6 +151,69 @@ agent** folds the oldest turns into a rolling summary, keeping the most recent `
 verbatim. Compaction is a durable step (it replays, never re-summarizes, on resume). Per turn the CLI
 shows a `Context: ~N / M tokens` line and a `(compacting prior context…)` indicator while it runs.
 
+## Observability
+
+The running system is observable at three layers that all key off the **same stable step names**, so
+logs, the Restate journal, and the per-turn trace correlate.
+
+- **Tier-1 structured logs.** Each LLM step and tool call emits one line through the SDK logger — e.g.
+  `llm step=planner model=… tokens.in=… tokens.out=…`, `tool step=investigate:0:tool:1:0
+  name=web_search`, and per-turn `turn start|done|failed` lines. The SDK prefixes every line with
+  `[<invocationTarget>][<invocationId>]` (e.g. `session/sendTurn`, `investigator/investigate`); that
+  invocation id is the correlation key shared with the journal and UI. Logs are suppressed during
+  replay, so after a crash/resume only freshly executed steps print. Control verbosity with
+  `RESTATE_LOGGING` (`TRACE|DEBUG|INFO|WARN|ERROR`, default `INFO`); `DEBUG` adds a truncated
+  LLM-output preview per step.
+- **Restate journal / UI.** Every durable `ctx.run` step is journaled and visible at
+  <http://localhost:9070>.
+- **Tier-2 per-turn trace.** A truncated `TraceEvent[]` is stored on each turn and read back via the
+  `getTrace` shared handler or the CLI:
+
+```bash
+npm run cli trace <sessionId> [turnId]   # ordered transcript of the turn's LLM/tool steps
+```
+
+Each event carries its stable `step`, a `kind` (`plan|investigate|llm|tool|synthesize|compact`), an
+optional model + token counts, and a truncated, secret-free detail. The trace is queryable durable
+state (independent of log level); full per-call args/results stay in the journal.
+
+### Step-name convention
+
+Deterministic and stable across replay so the three surfaces line up:
+
+- `planner` / `synthesizer` — the planning and synthesis calls (in the Session invocation).
+- `compact` — a journal-compaction summary call.
+- `investigate:<i>:llm:<n>` (and `investigate:<i>:llm:final` for the degraded summary) plus
+  `investigate:<i>:tool:<n>:<k>` — the i-th sub-question's investigator loop, which runs as its own
+  `investigator` service invocation (`i` = sub-question index, `n` = loop turn, `k` = tool-call index).
+
+### Health
+
+- **Liveness** — the service endpoint answers `/health` with `200 OK` (built into the SDK). The
+  endpoint speaks HTTP/2 cleartext (h2c), so a raw curl must request prior-knowledge HTTP/2 (a plain
+  HTTP/1.1 curl fails with "Received HTTP/0.9 when not allowed"):
+
+```bash
+curl --http2-prior-knowledge localhost:9080/health   # expect: OK
+```
+- **Readiness** — the `health` service reports whether dependencies are configured, as booleans only
+  (never secret values):
+
+```bash
+npm run cli health                       # or: curl localhost:8080/health/check --json '{}'
+# { "status": "ok", "service": "durable-research", "checks": { "openai": true, "tavily": true } }
+```
+
+`status` is `degraded` when a required key is missing.
+
+### Restate UI walkthrough — a tool-call lifecycle
+
+With a turn running or finished, open <http://localhost:9070>, find the `session/sendTurn` invocation,
+and follow its journaled steps in order: `planner` → the fanned-out `investigator/investigate`
+invocations (each with `investigate:<i>:llm:<n>` and `investigate:<i>:tool:<n>:<k>` steps whose
+args/results you can inspect) → `synthesizer`. The same step names appear in the logs and in
+`npm run cli trace`, so you can pivot across the three views by step name and invocation id.
+
 ## Project layout
 
 ```
@@ -155,6 +224,7 @@ src/
   greeting.ts         # pure greeting logic (unit-tested)
   services/
     greeter.ts        # Phase 0 durable "greeter" service
+    health.ts         # readiness handler (complements the SDK's built-in /health liveness)
   llm/
     client.ts         # lazy OpenAI client (reads OPENAI_API_KEY)
     wrapper.ts        # callStructured + callTools: durable LLM calls (ctx.run)
@@ -187,7 +257,8 @@ runtime. `MAX_CONCURRENCY` (default 3) bounds how many investigators run at once
 `9080`) sets the service endpoint. The durability knobs (`OPENAI_TIMEOUT_MS`, `OPENAI_MAX_RETRIES`,
 `RESTATE_INACTIVITY_TIMEOUT_MS`, `RESTATE_ABORT_TIMEOUT_MS`) are covered in "Durability &
 crash-resume"; the refinement/compaction knobs (`FRESHNESS_TTL`, `MAX_JOURNAL_TURNS`,
-`CONTEXT_MAX_TOKENS`, `JOURNAL_MAX_CHARS_PER_TURN`, `OPENAI_MODEL_COMPACTOR`) in "Refinement & reuse".
+`CONTEXT_MAX_TOKENS`, `JOURNAL_MAX_CHARS_PER_TURN`, `OPENAI_MODEL_COMPACTOR`) in "Refinement & reuse";
+and the observability knobs (`RESTATE_LOGGING`, `TRACE_MAX_EVENTS`) in "Observability".
 
 ## Continuous integration
 

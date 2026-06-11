@@ -485,3 +485,68 @@ that references it).
   (TTL applies to verbatim turns) — accepted for the POC.
 - **Made by:** Human+Agent
 - **Date:** 2026-06-10
+
+## Phase 10 — Observability & hardening
+
+### Tier-2 per-turn trace: assembled by the orchestrator, persisted by the Session
+- **Decision:** Record an ordered, truncated `TraceEvent[]` per turn (`{ step, kind, detail, model?,
+  tokens? }`), exposed via a `getTrace` shared handler and `npm run cli trace`. The investigator
+  returns its own ordered trace fragment; the orchestrator brackets it with plan/investigate/synthesize
+  events through a new `onTrace` hook; the Session appends + persists it (capped at `TRACE_MAX_EVENTS`)
+  and emits the `compact` event. Token usage is duplicated between `usage[]` and trace `llm` events so
+  the trace JSON is self-contained.
+- **Alternatives:** derive the trace in the Session from the existing usage/tool-call hooks (loses the
+  per-investigation index and tool-arg previews); a coarse one-event-per-investigation summary; logging
+  the trace into the stream instead of storing it.
+- **Rationale / trade-offs:** each component describes what it owns (investigator = its loop,
+  orchestrator = the flow, Session = state); reuses the existing hook pattern (replay-safe, observable
+  mid-turn); yields a faithful per-step transcript. The trace is queryable durable state, deliberately
+  separate from the ephemeral log stream. Accepts a little token duplication for a self-contained JSON.
+- **Made by:** Human+Agent
+- **Date:** 2026-06-10
+
+### Investigator step names namespaced by sub-question index (supersedes `llm:<n>`)
+- **Decision:** Investigator `ctx.run` steps are now `investigate:<i>:llm:<n>` /
+  `investigate:<i>:tool:<n>:<k>` / `investigate:<i>:llm:final` (was `llm:<n>` / `tool:<n>:<k>`), so one
+  stable name correlates logs, journal, and trace and stays globally unique once aggregated into a turn.
+  Added a `tool` Tier-1 log line and `turn start|done|failed` lines. Supersedes the Phase-4 step-name
+  convention.
+- **Alternatives:** keep bare `llm:<n>` and disambiguate by invocation id only.
+- **Rationale / trade-offs:** matches the form already documented in the LLM wrapper and the PRD's
+  correlation goal; the invocation id alone correlated logs↔journal but not the aggregated per-turn
+  usage/trace. No runtime cost.
+- **Made by:** Human+Agent
+- **Date:** 2026-06-10
+
+### Health: built-in liveness + an application readiness handler
+- **Decision:** Rely on the SDK endpoint's built-in `GET :9080/health` (`200 OK`) for liveness, and add
+  a small `health` service whose `check` handler reports dependency readiness as booleans
+  (`openai`/`tavily` configured) with `status: ok|degraded` — never secret values. Pure
+  `computeReadiness` is unit-tested.
+- **Alternatives:** only document the built-in route; a separate bespoke HTTP health server; reporting
+  key values.
+- **Rationale / trade-offs:** liveness (process serving) and readiness (deps configured) answer
+  different questions; the readiness handler is invokable/testable and feeds the Phase-11 Kubernetes
+  probes, while booleans keep it secret-free.
+- **Made by:** Human+Agent
+- **Date:** 2026-06-10
+
+### Error handling: invalid tool arguments are terminal
+- **Decision:** `runTool` validates model-supplied args with `safeParse` and throws `TerminalError` on
+  failure, joining the existing terminal cases (bad JSON, unknown tool). Transient Tavily/network
+  failures stay retryable; `fetch_page` still degrades gracefully.
+- **Alternatives:** let the `ZodError` propagate (Restate then retries a permanently-doomed call); feed
+  the validation error back to the model.
+- **Rationale / trade-offs:** retrying a structurally-invalid call can never succeed and just burns the
+  retry budget until abort; failing terminally is correct and matches "malformed input → terminal".
+- **Made by:** Human+Agent
+- **Date:** 2026-06-10
+
+### Logging knob reconciled to `RESTATE_LOGGING` (dropped dead `LOG_LEVEL`)
+- **Decision:** `.env.example` now documents `RESTATE_LOGGING` (the var the SDK's default logger
+  actually reads) and drops the never-read `LOG_LEVEL`; added `TRACE_MAX_EVENTS`.
+- **Alternatives:** wire `LOG_LEVEL` into a custom logger transport.
+- **Rationale / trade-offs:** `LOG_LEVEL` was misleading dead config; pointing at the real SDK var is
+  simpler than a custom transport for a POC. `DEBUG` surfaces the truncated LLM-output previews.
+- **Made by:** Human+Agent
+- **Date:** 2026-06-10

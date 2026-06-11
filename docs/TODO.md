@@ -177,11 +177,11 @@ independently verifiable, and ends in a runnable state.
 
 > Goal: structured per-turn traces and operational robustness.
 
-- [ ] Tier-2 per-turn `trace` (truncated `TraceEvent[]`) + a `getTrace` shared handler.
-- [ ] Apply step-naming conventions consistently across logs, journal, and trace.
-- [ ] Health check; consistent error handling (terminal vs retryable); structured logging polish.
-- [ ] **Security:** confirm traces/logs are truncated and secret-free.
-- [ ] **Docs:** README "observability" + a Restate UI walkthrough of a tool-call lifecycle.
+- [x] Tier-2 per-turn `trace` (truncated `TraceEvent[]`) + a `getTrace` shared handler.
+- [x] Apply step-naming conventions consistently across logs, journal, and trace.
+- [x] Health check; consistent error handling (terminal vs retryable); structured logging polish.
+- [x] **Security:** confirm traces/logs are truncated and secret-free.
+- [x] **Docs:** README "observability" + a Restate UI walkthrough of a tool-call lifecycle.
 
 **Acceptance criteria**
 - [ ] `getTrace` returns a readable transcript of a turn's LLM/tool steps.

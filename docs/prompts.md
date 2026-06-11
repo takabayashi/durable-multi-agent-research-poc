@@ -159,8 +159,12 @@ a hung call fails fast (below the Restate inactivity timeout) and is retried dur
 
 ## Step-name convention
 
-Deterministic and stable across replay, so journal entries, logs, and (later) traces correlate:
+Deterministic and stable across replay, so journal entries, logs, and the per-turn trace correlate:
 
 - `planner` / `synthesizer` — the planning and synthesis calls (in the Session invocation)
-- each investigator is its own `investigator` service invocation, whose steps are `llm:<n>`
-  (`llm:final` for the degraded summary) and `tool:<n>:<k>` (`web_search` / `fetch_page`)
+- `compact` — the journal-compaction summary call (in the Session invocation)
+- each investigator is its own `investigator` service invocation; its steps are namespaced by the
+  sub-question index `i`: `investigate:<i>:llm:<n>` (`investigate:<i>:llm:final` for the degraded
+  summary) and `investigate:<i>:tool:<n>:<k>` (`web_search` / `fetch_page`)
+
+These same names appear in the Tier-2 trace (`getTrace`); see the README "Observability" section.
