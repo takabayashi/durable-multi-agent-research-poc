@@ -36,8 +36,14 @@ export async function runTool(name: string, argsJson: string): Promise<ToolOutco
 
   switch (name) {
     case "web_search": {
-      const { query } = WebSearchArgs.parse(parsed);
-      const results = await webSearch({ query });
+      // Invalid model-supplied args are permanent: fail terminally so ctx.run
+      // doesn't retry a call that can never succeed. (Transient Tavily/network
+      // failures inside webSearch stay retryable.)
+      const args = WebSearchArgs.safeParse(parsed);
+      if (!args.success) {
+        throw new restate.TerminalError('tool "web_search": invalid arguments');
+      }
+      const results = await webSearch({ query: args.data.query });
       const rendered = results
         .map((r, i) => `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.content}`)
         .join("\n\n");
@@ -47,8 +53,11 @@ export async function runTool(name: string, argsJson: string): Promise<ToolOutco
       };
     }
     case "fetch_page": {
-      const { url } = FetchPageArgs.parse(parsed);
-      const page = await fetchPage({ url });
+      const args = FetchPageArgs.safeParse(parsed);
+      if (!args.success) {
+        throw new restate.TerminalError('tool "fetch_page": invalid arguments');
+      }
+      const page = await fetchPage({ url: args.data.url });
       return {
         outputForModel: `TITLE: ${page.title}\nURL: ${page.url}\n\n${page.text}`,
         found: [{ title: page.title, url: page.url }],

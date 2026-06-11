@@ -1,6 +1,7 @@
+import { TerminalError } from "@restatedev/restate-sdk";
 import { describe, expect, it } from "vitest";
 import { FetchPageArgs } from "./fetch";
-import { collectSources } from "./registry";
+import { collectSources, runTool } from "./registry";
 import { WebSearchArgs } from "./search";
 
 describe("collectSources", () => {
@@ -66,5 +67,25 @@ describe("tool arg schemas", () => {
     expect(FetchPageArgs.parse({ url: "https://x.com" }).url).toBe("https://x.com");
     expect(() => WebSearchArgs.parse({})).toThrow();
     expect(() => FetchPageArgs.parse({ url: 123 })).toThrow();
+  });
+});
+
+describe("runTool error handling (terminal vs retryable)", () => {
+  it("fails terminally on non-JSON arguments", async () => {
+    await expect(runTool("web_search", "not json")).rejects.toBeInstanceOf(TerminalError);
+  });
+
+  it("fails terminally on invalid web_search arguments (no retry of a doomed call)", async () => {
+    await expect(runTool("web_search", "{}")).rejects.toBeInstanceOf(TerminalError);
+  });
+
+  it("fails terminally on invalid fetch_page arguments", async () => {
+    await expect(runTool("fetch_page", JSON.stringify({ url: 123 }))).rejects.toBeInstanceOf(
+      TerminalError,
+    );
+  });
+
+  it("fails terminally on an unknown tool", async () => {
+    await expect(runTool("nope", "{}")).rejects.toBeInstanceOf(TerminalError);
   });
 });
