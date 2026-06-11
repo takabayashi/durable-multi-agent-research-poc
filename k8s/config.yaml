@@ -1,0 +1,43 @@
+# Non-secret runtime tuning for the durable-research service.
+# Secrets (OPENAI_API_KEY, TAVILY_API_KEY) live in a separate Secret created from .env
+# (see README / runbooks), never here and never in the image.
+# Mirrors the non-secret vars in .env.example; adjust models to names your account can use.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: durable-research-config
+  namespace: restate
+data:
+  PORT: "9080"
+
+  # Models (cost-optimized). Replace with snapshots available to your account.
+  OPENAI_MODEL_PLANNER: "gpt-5.4-nano"
+  OPENAI_MODEL_INVESTIGATOR: "gpt-5.4-mini"
+  OPENAI_MODEL_SYNTHESIZER: "gpt-5.4"
+  OPENAI_MODEL_COMPACTOR: "gpt-5.4-mini"
+
+  # Research bounds
+  MAX_SUBQUESTIONS: "5"
+  MAX_CONCURRENCY: "3"
+
+  # Refinement & context journal
+  FRESHNESS_TTL: "3600"
+  MAX_JOURNAL_TURNS: "3"
+  CONTEXT_MAX_TOKENS: "6000"
+  JOURNAL_MAX_CHARS_PER_TURN: "1200"
+
+  # Tools
+  WEB_SEARCH_MAX_RESULTS: "5"
+  FETCH_PAGE_MAX_CHARS: "6000"
+  MAX_TOOL_TURNS: "5"
+  MAX_SOURCES: "8"
+
+  # Durability (keep OPENAI_TIMEOUT_MS < RESTATE_INACTIVITY_TIMEOUT_MS)
+  OPENAI_TIMEOUT_MS: "120000"
+  OPENAI_MAX_RETRIES: "0"
+  RESTATE_INACTIVITY_TIMEOUT_MS: "300000"
+  RESTATE_ABORT_TIMEOUT_MS: "60000"
+
+  # Logging & observability
+  RESTATE_LOGGING: "INFO"
+  TRACE_MAX_EVENTS: "500"

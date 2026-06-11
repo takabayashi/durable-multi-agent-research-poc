@@ -1,0 +1,32 @@
+# Restate server, managed by the Restate Operator.
+#
+# The operator reconciles this into a single-node StatefulSet + Service + PVC in a
+# namespace that matches metadata.name (here: "restate"). A single-node cluster
+# self-provisions, so no `restatectl provision` / cluster.autoProvision is needed.
+#
+# Sized down for minikube (the operator/chart defaults are large). RocksDB memory is
+# capped well under the pod memory limit. NetworkPolicies are disabled locally because
+# minikube's default CNI does not enforce them — disabling makes behavior explicit and
+# CNI-independent (matches Restate's official local guide). Keep them ON in production
+# and instead label the app namespace `allow.restate.dev/<name>`.
+apiVersion: restate.dev/v1
+kind: RestateCluster
+metadata:
+  name: restate
+spec:
+  compute:
+    image: docker.restate.dev/restatedev/restate:1.6.0 # any server >= 1.4 (SDK is 1.14.5)
+    resources:
+      requests:
+        cpu: "250m"
+        memory: "512Mi"
+      limits:
+        cpu: "2"
+        memory: "2Gi"
+  storage:
+    storageRequestBytes: 2147483648 # 2 GiB durable journal/state (survives pod restarts)
+    storageClassName: standard # minikube's default dynamic provisioner
+  security:
+    disableNetworkPolicies: true # local only — see comment above
+  config: |
+    rocksdb-total-memory-size = "512 MB"

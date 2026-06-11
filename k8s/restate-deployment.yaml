@@ -1,0 +1,60 @@
+# The durable-research service, managed by the Restate Operator.
+#
+# A RestateDeployment is like a Deployment but the operator also creates a versioned
+# ReplicaSet + Service per pod-template revision and AUTO-REGISTERS it with the cluster
+# named below — no manual `restate deployments register`. On a template change (e.g. a
+# new image tag) it creates a NEW version, routes new invocations to it, and keeps the
+# OLD ReplicaSet alive until its in-flight invocations drain (zero-downtime redeploy).
+#
+# Secrets + non-secret config are injected via envFrom; nothing is baked into the image.
+# The SDK endpoint speaks HTTP/2 cleartext (h2c), so probes use tcpSocket (an HTTP/1.1
+# httpGet probe would fail the h2c handshake).
+apiVersion: restate.dev/v1beta1
+kind: RestateDeployment
+metadata:
+  name: durable-research
+  namespace: restate
+spec:
+  replicas: 1
+  restate:
+    register:
+      service:
+        name: restate
+        namespace: restate
+  selector:
+    matchLabels:
+      app: durable-research
+  template:
+    metadata:
+      labels:
+        app: durable-research
+    spec:
+      containers:
+        - name: app
+          image: durable-research:0.1.0 # built locally + `minikube image load`ed
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: restate
+              containerPort: 9080
+          envFrom:
+            - secretRef:
+                name: durable-research-secrets
+            - configMapRef:
+                name: durable-research-config
+          readinessProbe:
+            tcpSocket:
+              port: 9080
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 9080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "512Mi"
