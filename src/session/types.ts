@@ -40,6 +40,18 @@ export interface TokenUsage {
   outputTokens: number;
 }
 
+/** Per-turn snapshot of the conversation context fed to the planner/synthesizer. */
+export interface TurnContext {
+  /** Prior turns represented in the journal (verbatim + folded into the summary). */
+  priorTurnsUsed: number;
+  /** Heuristic token estimate of the journal used this turn. */
+  estimatedTokens: number;
+  /** The compaction budget (CONTEXT_MAX_TOKENS) at the time, for display. */
+  budgetTokens: number;
+  /** Whether older turns were compacted into the rolling summary this turn. */
+  compacted: boolean;
+}
+
 export interface Turn {
   turnId: string;
   message: string;
@@ -49,6 +61,8 @@ export interface Turn {
   usage?: TokenUsage[];
   /** Per-turn tool-call counts by tool name, e.g. { web_search: 2, fetch_page: 3 }. */
   toolCalls?: Record<string, number>;
+  /** Conversation-context snapshot for this turn (journal size, reuse, compaction). */
+  context?: TurnContext;
   createdAt: number;
 }
 
@@ -65,4 +79,6 @@ export interface Progress {
   currentTurnId: string | null;
   message: string | null;
   subQuestions: SubQuestionProgress[];
+  /** True while the session is compacting older turns into the rolling summary. */
+  compacting: boolean;
 }
