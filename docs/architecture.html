@@ -1,0 +1,1244 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Durable Multi-Agent Research · Architecture</title>
+    <meta
+      name="description"
+      content="Visual architecture of the durable multi-agent research assistant built on Restate."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+        --maxw: 1180px;
+        --radius: 18px;
+        --radius-sm: 11px;
+        --transition: 220ms cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      /* ---------- Dark theme (default) ---------- */
+      [data-theme="dark"] {
+        --bg: #070b16;
+        --bg-grad-1: #0d1530;
+        --bg-grad-2: #0a1124;
+        --surface: rgba(20, 28, 51, 0.72);
+        --surface-solid: #121a2f;
+        --surface-2: rgba(31, 41, 71, 0.55);
+        --border: rgba(125, 145, 195, 0.16);
+        --border-strong: rgba(125, 145, 195, 0.32);
+        --text: #e8eefb;
+        --text-soft: #aab6d4;
+        --text-faint: #6f7da0;
+        --accent: #6366f1;
+        --accent-2: #22d3ee;
+        --accent-3: #a855f7;
+        --glow: rgba(99, 102, 241, 0.35);
+        --chip-bg: rgba(99, 102, 241, 0.12);
+        --shadow: 0 24px 60px -28px rgba(0, 0, 0, 0.85);
+        --nav-bg: rgba(8, 12, 24, 0.72);
+        color-scheme: dark;
+      }
+
+      /* ---------- Light theme ---------- */
+      [data-theme="light"] {
+        --bg: #eef1f8;
+        --bg-grad-1: #e3e9fb;
+        --bg-grad-2: #eaf6fb;
+        --surface: rgba(255, 255, 255, 0.82);
+        --surface-solid: #ffffff;
+        --surface-2: rgba(241, 244, 252, 0.85);
+        --border: rgba(60, 80, 130, 0.15);
+        --border-strong: rgba(60, 80, 130, 0.28);
+        --text: #111a30;
+        --text-soft: #44516f;
+        --text-faint: #7d89a6;
+        --accent: #5b5ef0;
+        --accent-2: #0891b2;
+        --accent-3: #9333ea;
+        --glow: rgba(91, 94, 240, 0.22);
+        --chip-bg: rgba(91, 94, 240, 0.1);
+        --shadow: 0 22px 50px -30px rgba(30, 50, 110, 0.45);
+        --nav-bg: rgba(255, 255, 255, 0.78);
+        color-scheme: light;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+        scroll-padding-top: 92px;
+      }
+
+      body {
+        margin: 0;
+        font-family: var(--font-sans);
+        color: var(--text);
+        background:
+          radial-gradient(1100px 620px at 12% -8%, var(--bg-grad-1), transparent 60%),
+          radial-gradient(1000px 560px at 92% 4%, var(--bg-grad-2), transparent 55%),
+          var(--bg);
+        background-attachment: fixed;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        transition: background var(--transition), color var(--transition);
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      /* ---------- Scroll progress bar ---------- */
+      #progress {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 3px;
+        width: 0%;
+        z-index: 60;
+        background: linear-gradient(90deg, var(--accent), var(--accent-2), var(--accent-3));
+        box-shadow: 0 0 14px var(--glow);
+        transition: width 80ms linear;
+      }
+
+      /* ---------- Top nav ---------- */
+      nav.top {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        backdrop-filter: blur(16px) saturate(140%);
+        -webkit-backdrop-filter: blur(16px) saturate(140%);
+        background: var(--nav-bg);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .nav-inner {
+        max-width: var(--maxw);
+        margin: 0 auto;
+        padding: 13px 22px;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+        white-space: nowrap;
+      }
+
+      .brand .dot {
+        width: 26px;
+        height: 26px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        box-shadow: 0 0 18px var(--glow);
+        position: relative;
+        flex: none;
+      }
+      .brand .dot::after {
+        content: "";
+        position: absolute;
+        inset: 6px;
+        border-radius: 4px;
+        border: 2px solid rgba(255, 255, 255, 0.85);
+        border-right-color: transparent;
+        border-bottom-color: transparent;
+      }
+
+      .nav-links {
+        display: flex;
+        gap: 4px;
+        margin-left: auto;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      .nav-links::-webkit-scrollbar {
+        display: none;
+      }
+
+      .nav-links a {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-soft);
+        padding: 7px 12px;
+        border-radius: 9px;
+        white-space: nowrap;
+        transition: color var(--transition), background var(--transition);
+      }
+      .nav-links a:hover {
+        color: var(--text);
+        background: var(--surface-2);
+      }
+      .nav-links a.active {
+        color: var(--text);
+        background: var(--chip-bg);
+        box-shadow: inset 0 0 0 1px var(--border-strong);
+      }
+
+      .theme-toggle {
+        flex: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-soft);
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 7px 12px;
+        cursor: pointer;
+        transition: var(--transition);
+      }
+      .theme-toggle:hover {
+        color: var(--text);
+        border-color: var(--border-strong);
+      }
+
+      /* ---------- Header / hero ---------- */
+      header.hero {
+        max-width: var(--maxw);
+        margin: 0 auto;
+        padding: 70px 22px 30px;
+        position: relative;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        font-size: 12.5px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-soft);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        padding: 7px 14px;
+        border-radius: 999px;
+        box-shadow: var(--shadow);
+      }
+      .eyebrow .pulse {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--accent-2);
+        box-shadow: 0 0 0 0 var(--accent-2);
+        animation: pulse 2.4s infinite;
+      }
+      @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.55); }
+        70% { box-shadow: 0 0 0 10px rgba(34, 211, 238, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }
+      }
+
+      h1.title {
+        font-size: clamp(34px, 6vw, 62px);
+        line-height: 1.04;
+        letter-spacing: -0.03em;
+        margin: 22px 0 0;
+        font-weight: 800;
+      }
+      h1.title .grad {
+        background: linear-gradient(115deg, var(--accent) 10%, var(--accent-2) 55%, var(--accent-3) 95%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .lede {
+        max-width: 760px;
+        margin: 20px 0 0;
+        font-size: clamp(16px, 2.1vw, 19px);
+        color: var(--text-soft);
+      }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 9px;
+        margin-top: 28px;
+      }
+      .chip {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-soft);
+        background: var(--chip-bg);
+        border: 1px solid var(--border);
+        padding: 6px 11px;
+        border-radius: 8px;
+      }
+
+      .stat-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 14px;
+        margin-top: 34px;
+      }
+      .stat {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 16px 18px;
+        box-shadow: var(--shadow);
+      }
+      .stat .n {
+        font-size: 26px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        background: linear-gradient(120deg, var(--accent), var(--accent-2));
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .stat .l {
+        font-size: 12.5px;
+        color: var(--text-faint);
+        margin-top: 2px;
+      }
+
+      /* ---------- Sections ---------- */
+      main {
+        max-width: var(--maxw);
+        margin: 0 auto;
+        padding: 26px 22px 90px;
+      }
+
+      section.card {
+        scroll-margin-top: 92px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 26px 26px 30px;
+        margin-top: 30px;
+        box-shadow: var(--shadow);
+        position: relative;
+        overflow: hidden;
+      }
+      section.card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, var(--border-strong), transparent);
+      }
+
+      .sec-head {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        margin-bottom: 6px;
+      }
+      .badge {
+        flex: none;
+        width: 46px;
+        height: 46px;
+        border-radius: 13px;
+        display: grid;
+        place-items: center;
+        font-family: var(--font-mono);
+        font-weight: 700;
+        font-size: 15px;
+        color: #fff;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        box-shadow: 0 10px 26px -10px var(--glow);
+      }
+      .sec-head h2 {
+        margin: 0;
+        font-size: 22px;
+        letter-spacing: -0.02em;
+        font-weight: 700;
+      }
+      .sec-head p {
+        margin: 4px 0 0;
+        color: var(--text-soft);
+        font-size: 14.5px;
+        max-width: 80ch;
+      }
+
+      .diagram {
+        margin-top: 20px;
+        background:
+          linear-gradient(var(--surface-solid), var(--surface-solid)) padding-box,
+          linear-gradient(120deg, var(--border-strong), transparent 40%, transparent 60%, var(--border-strong)) border-box;
+        border: 1px solid transparent;
+        border-radius: var(--radius-sm);
+        padding: 18px;
+        overflow: auto;
+      }
+      .diagram .mermaid {
+        display: flex;
+        justify-content: center;
+        min-width: min-content;
+      }
+      .diagram svg {
+        max-width: 100%;
+        height: auto;
+      }
+      .diagram .mmd-error {
+        font-family: var(--font-mono);
+        font-size: 12.5px;
+        color: #f87171;
+        white-space: pre-wrap;
+      }
+
+      .note {
+        margin-top: 16px;
+        font-size: 13.5px;
+        color: var(--text-soft);
+        background: var(--surface-2);
+        border-left: 3px solid var(--accent);
+        border-radius: 0 10px 10px 0;
+        padding: 11px 15px;
+      }
+      .note code,
+      .sec-head code,
+      .lede code {
+        font-family: var(--font-mono);
+        font-size: 0.86em;
+        background: var(--chip-bg);
+        padding: 1px 6px;
+        border-radius: 5px;
+      }
+
+      /* ---------- Footer ---------- */
+      footer {
+        max-width: var(--maxw);
+        margin: 0 auto;
+        padding: 34px 22px 70px;
+        color: var(--text-faint);
+        font-size: 13.5px;
+        border-top: 1px solid var(--border);
+      }
+      footer .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 18px;
+        margin-bottom: 18px;
+      }
+      footer .legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        color: var(--text-soft);
+      }
+      footer .swatch {
+        width: 13px;
+        height: 13px;
+        border-radius: 4px;
+        display: inline-block;
+      }
+
+      @media (max-width: 720px) {
+        .brand .name {
+          display: none;
+        }
+        section.card {
+          padding: 20px 16px 24px;
+        }
+        .diagram {
+          padding: 12px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="progress"></div>
+
+    <nav class="top">
+      <div class="nav-inner">
+        <a class="brand" href="#top">
+          <span class="dot"></span>
+          <span class="name">Durable Research</span>
+        </a>
+        <div class="nav-links" id="navLinks"></div>
+        <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+          <span id="themeIcon">◐</span><span id="themeLabel">Light</span>
+        </button>
+      </div>
+    </nav>
+
+    <header class="hero" id="top">
+      <span class="eyebrow"><span class="pulse"></span> Architecture map · built from source</span>
+      <h1 class="title">
+        Durable <span class="grad">Multi-Agent Research</span><br />Assistant
+      </h1>
+      <p class="lede">
+        A multi-turn research backend on <strong>Restate</strong> durable execution: a
+        <code>session</code> Virtual Object drives an orchestrator that <strong>plans</strong>,
+        fans out <strong>investigators</strong> in parallel over real web tools, and
+        <strong>synthesizes</strong> a cited answer — surviving crashes without ever repeating
+        completed LLM or tool calls.
+      </p>
+
+      <div class="chips" id="chips"></div>
+
+      <div class="stat-row">
+        <div class="stat"><div class="n">4</div><div class="l">Restate services</div></div>
+        <div class="stat"><div class="n">5</div><div class="l">LLM agents</div></div>
+        <div class="stat"><div class="n">2</div><div class="l">Durable tools</div></div>
+        <div class="stat"><div class="n">3</div><div class="l">Observability tiers</div></div>
+        <div class="stat"><div class="n">ctx.run</div><div class="l">Replay boundary</div></div>
+      </div>
+    </header>
+
+    <main id="sections"></main>
+
+    <footer>
+      <div class="legend">
+        <span><span class="swatch" style="background: var(--accent)"></span> Durable / stateful</span>
+        <span><span class="swatch" style="background: var(--accent-2)"></span> Stateless compute</span>
+        <span><span class="swatch" style="background: var(--accent-3)"></span> External provider</span>
+      </div>
+      Diagrams rendered with Mermaid 11 from CDN, derived directly from the
+      <code>src/</code> tree and <code>k8s/</code> manifests. Open this file in any browser — no build
+      step. Toggle the theme top-right; diagrams re-render to match.
+    </footer>
+
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+
+      /* ------------------------------------------------------------------ *
+       * Diagram definitions — each derived from the actual codebase.        *
+       * ------------------------------------------------------------------ */
+      const sections = [
+        {
+          id: "file-structure",
+          title: "Project file structure",
+          desc: "How the src/ tree is organised — entry points, agents, the LLM transport layer, durable tools, services, and the session state object.",
+          code: `flowchart LR
+  root["durable-multi-agent-research-poc"]
+  root --> src["src/"]
+  root --> docs["docs/ — PRD, decisions, runbooks"]
+  root --> k8s["k8s/ — Operator manifests"]
+  root --> infra["Dockerfile · CI · biome · tsconfig"]
+
+  src --> app["app.ts — endpoint entry :9080"]
+  src --> cli["cli.ts · cli.output.ts"]
+  src --> agents["agents/"]
+  src --> llm["llm/"]
+  src --> tools["tools/"]
+  src --> services["services/"]
+  src --> session["session/"]
+
+  agents --> ag1["orchestrator.ts"]
+  agents --> ag2["planner.ts"]
+  agents --> ag3["investigator.ts"]
+  agents --> ag4["synthesizer.ts"]
+  agents --> ag5["compactor.ts"]
+  agents --> ag6["journal.ts — pure"]
+
+  llm --> l1["client.ts — lazy OpenAI"]
+  llm --> l2["wrapper.ts — callStructured / callTools"]
+  llm --> l3["format.ts — untrusted-data block"]
+
+  tools --> t1["search.ts — web_search"]
+  tools --> t2["fetch.ts — fetch_page"]
+  tools --> t3["registry.ts — dispatch"]
+  tools --> t4["url.ts — dedup"]
+
+  services --> s1["health.ts"]
+  services --> s2["greeter.ts"]
+
+  session --> se1["session.ts — Virtual Object"]
+  session --> se2["types.ts — domain model"]
+
+  class root,session,se1 durable;
+  class agents,ag1,ag2,ag3,ag4,ag5,ag6,llm,l1,l2,l3,tools,t1,t2,t3,t4,cli,services,s1,s2 compute;
+  classDef durable fill:#312e81,stroke:#6366f1,color:#fff;
+  classDef compute fill:#0e7490,stroke:#22d3ee,color:#fff;`,
+        },
+        {
+          id: "layers",
+          title: "System layers overview",
+          desc: "From the CLI down to external providers. The Restate server sits in front as ingress + durable journal; every agent call eventually reaches OpenAI or Tavily.",
+          code: `flowchart TB
+  subgraph client_layer["Client layer"]
+    cli["CLI — start · turn · progress · trace · health"]
+    http["HTTP client / curl"]
+  end
+  subgraph durable_layer["Durable execution — Restate server"]
+    ingress["Ingress :8080"]
+    journal[("Durable journal + state")]
+    adminui["Admin / UI :9070"]
+  end
+  subgraph svc_layer["Service endpoint :9080 — this app"]
+    session["session — Virtual Object"]
+    investigator["investigator — Service"]
+    health["health — Service"]
+    greeter["greeter — Service"]
+  end
+  subgraph agent_layer["Agent / domain logic"]
+    orchestrator["orchestrator — runResearch"]
+    planner["planner"]
+    synthesizer["synthesizer"]
+    compactor["compactor"]
+  end
+  subgraph provider_layer["External providers"]
+    openai["OpenAI Responses API"]
+    tavily["Tavily Search API"]
+    web["Web pages"]
+  end
+
+  cli --> ingress
+  http --> ingress
+  ingress --> session
+  ingress --> investigator
+  ingress --> health
+  ingress --> greeter
+  session <--> journal
+  investigator <--> journal
+  session --> orchestrator
+  orchestrator --> planner
+  orchestrator --> investigator
+  orchestrator --> synthesizer
+  session --> compactor
+  planner --> openai
+  synthesizer --> openai
+  compactor --> openai
+  investigator --> openai
+  investigator --> tavily
+  investigator --> web
+
+  class session,journal,adminui durable;
+  class orchestrator,planner,synthesizer,compactor,investigator,health,greeter,cli,http,ingress compute;
+  class openai,tavily,web external;
+  classDef durable fill:#312e81,stroke:#6366f1,color:#fff;
+  classDef compute fill:#0e7490,stroke:#22d3ee,color:#fff;
+  classDef external fill:#6b21a8,stroke:#a855f7,color:#fff;`,
+        },
+        {
+          id: "turn-flow",
+          title: "Research turn flow — plan · investigate · synthesize",
+          desc: "The orchestrator–worker sequence behind one sendTurn: the planner decomposes, investigators fan out concurrently, the synthesizer writes a cited answer. The CLI polls progress out-of-band.",
+          code: `sequenceDiagram
+  autonumber
+  actor U as CLI user
+  participant R as Restate ingress
+  participant S as session VO
+  participant O as orchestrator
+  participant P as planner LLM
+  participant I as investigators xN
+  participant Y as synthesizer LLM
+
+  U->>R: sendTurn(message, turnId) [fire-and-forget]
+  R->>S: invoke sendTurn (single writer)
+  S->>S: persist turn + build journal
+  S->>O: runResearch(message, hooks, journal)
+  O->>P: plan(question, journal)
+  P-->>O: trivial? OR new sub-questions
+  alt trivial message
+    O-->>S: direct answer, no citations
+  else needs research
+    O->>I: investigate(subQ) batched at MAX_CONCURRENCY
+    I-->>O: findings + sources + usage + trace
+    O->>Y: synthesize(question, subResults, journal)
+    Y-->>O: answer + citedSourceIds
+  end
+  O-->>S: Answer
+  S->>S: status = done, persist
+  loop poll until done
+    U->>R: getProgress / getResult(turnId)
+    R->>S: shared read-only handler
+    S-->>U: progress, then cited answer
+  end`,
+        },
+        {
+          id: "investigator",
+          title: "Investigator ReAct loop",
+          desc: "Each investigator is a stateless Service running a bounded ReAct loop. Every LLM turn and every tool call is its own ctx.run step, so completed steps replay on resume — no duplicate external calls.",
+          code: `flowchart TB
+  start(["investigate(subQuestion, index)"]) --> seed["seed conversation: system + SUB-QUESTION"]
+  seed --> loop{"turn < MAX_TOOL_TURNS ?"}
+  loop -- no --> degrade["final LLM call: summarize, no tools"]
+  loop -- yes --> llm["callTools — ctx.run(investigate:i:llm:n)"]
+  llm --> calls{"tool calls requested ?"}
+  calls -- no --> done["findings = assistant text"]
+  calls -- yes --> exec["per call: ctx.run(investigate:i:tool:n:k) runTool"]
+  exec --> tool{"which tool ?"}
+  tool -- web_search --> tav["Tavily — titles, urls, snippets"]
+  tool -- fetch_page --> fp["fetch + Readability — bounded text"]
+  tav --> feed["append function_call_output as untrusted data"]
+  fp --> feed
+  feed --> loop
+  degrade --> out
+  done --> out(["SubResult: findings + collectSources()"])
+
+  class start,out,exec,llm,degrade durable;
+  class tav,fp external;
+  classDef durable fill:#312e81,stroke:#6366f1,color:#fff;
+  classDef external fill:#6b21a8,stroke:#a855f7,color:#fff;`,
+        },
+        {
+          id: "fanout",
+          title: "Orchestrator-worker fan-out and concurrency",
+          desc: "Planner breadth is capped server-side at MAX_SUBQUESTIONS; investigators run via RestatePromise.all in batches of MAX_CONCURRENCY. Bounds are enforced by us, never by the model.",
+          code: `flowchart TB
+  plan["planner -> subQuestions[]"] --> cap["applyBreadthCap — MAX_SUBQUESTIONS = 5"]
+  cap --> batch["chunk() into batches of MAX_CONCURRENCY = 3"]
+  batch --> b1["Batch 1"]
+  batch --> b2["Batch 2 ..."]
+  b1 --> p1["RestatePromise.all"]
+  p1 --> i0["investigate:0"]
+  p1 --> i1["investigate:1"]
+  p1 --> i2["investigate:2"]
+  i0 --> agg["aggregate SubResults, usage, toolCalls, trace"]
+  i1 --> agg
+  i2 --> agg
+  b2 --> p2["RestatePromise.all — next batch"]
+  p2 --> agg
+  agg --> synth["synthesize(subResults, journal)"]
+
+  class i0,i1,i2,p1,p2 compute;
+  class plan,synth durable;
+  classDef durable fill:#312e81,stroke:#6366f1,color:#fff;
+  classDef compute fill:#0e7490,stroke:#22d3ee,color:#fff;`,
+          note: "Knobs live in env / the k8s ConfigMap: <code>MAX_SUBQUESTIONS</code> caps agentic breadth; <code>MAX_CONCURRENCY</code> caps how many investigators run at once — together they bound rate and cost.",
+        },
+        {
+          id: "providers",
+          title: "Provider abstraction — durable LLM transport",
+          desc: "Every model call funnels through one durable entry point. callStructured (Zod-typed JSON) and callTools (ReAct) both wrap ctx.run; getOpenAI is a lazy singleton with retries delegated to Restate.",
+          code: `classDiagram
+  class callStructured {
+    +ctx.run(step)
+    +responses.parse(schema)
+    +parallel_tool_calls = false
+    +returns data + TokenUsage
+  }
+  class callTools {
+    +ctx.run(step)
+    +responses.create(tools)
+    +returns outputItems + functionCalls + TokenUsage
+  }
+  class getOpenAI {
+    +lazy singleton
+    +maxRetries = 0
+    +per-request timeout
+  }
+  class PromptBuilders {
+    +plannerInput()
+    +investigatorInput()
+    +synthesizerInput()
+    +compactorInput()
+    +asUntrustedBlock()
+  }
+  callStructured --> getOpenAI
+  callTools --> getOpenAI
+  callStructured ..> PromptBuilders
+  callTools ..> PromptBuilders`,
+          code2: `flowchart LR
+  model["LLM function call"] --> runTool["runTool(name, argsJson)"]
+  runTool --> v{"valid JSON + args ?"}
+  v -- no --> terr["TerminalError — no retry"]
+  v -- yes --> sw{"tool name"}
+  sw -- web_search --> ws["webSearch -> Tavily"]
+  sw -- fetch_page --> fpp["fetchPage -> Readability + linkedom"]
+  ws --> outp["outputForModel + found[]"]
+  fpp --> outp
+  outp --> cs["collectSources -> stable Source ids Sn-k"]
+
+  class ws,fpp external;
+  classDef external fill:#6b21a8,stroke:#a855f7,color:#fff;`,
+          note: "Per-role models are configurable: <code>planner</code> uses a nano model, <code>investigator</code>/<code>compactor</code> a mini, <code>synthesizer</code> the full model. Native parallel tool-calls are disabled for deterministic replay.",
+        },
+        {
+          id: "domain",
+          title: "Domain model",
+          desc: "The durable shapes persisted on the session (src/session/types.ts). A Turn aggregates sub-questions, an answer, token usage, tool counts, a context snapshot, and a Tier-2 trace.",
+          code: `classDiagram
+  class Turn {
+    string turnId
+    string message
+    TurnStatus status
+    SubQuestion[] subQuestions
+    Answer answer
+    TokenUsage[] usage
+    map toolCalls
+    TurnContext context
+    TraceEvent[] trace
+    number createdAt
+  }
+  class SubQuestion {
+    string q
+    SubQuestionStatus status
+    string findings
+    Source[] sources
+  }
+  class SubResult {
+    string q
+    string findings
+    Source[] sources
+  }
+  class Answer {
+    string text
+    Source[] citations
+  }
+  class Source {
+    string id
+    string title
+    string url
+  }
+  class TokenUsage {
+    string step
+    string model
+    number inputTokens
+    number cachedTokens
+    number outputTokens
+  }
+  class TraceEvent {
+    string step
+    string kind
+    string detail
+    string model
+  }
+  class TurnContext {
+    number priorTurnsUsed
+    number estimatedTokens
+    number budgetTokens
+    bool compacted
+  }
+  class Progress {
+    string sessionId
+    string status
+    string currentTurnId
+    bool compacting
+  }
+  Turn "1" o-- "many" SubQuestion
+  Turn "1" o-- "1" Answer
+  Turn "1" o-- "many" TokenUsage
+  Turn "1" o-- "many" TraceEvent
+  Turn "1" o-- "1" TurnContext
+  SubQuestion "1" o-- "many" Source
+  Answer "1" o-- "many" Source
+  SubResult "1" o-- "many" Source`,
+        },
+        {
+          id: "lifecycle",
+          title: "Session lifecycle",
+          desc: "A session is a keyed Virtual Object. start() seeds it; each sendTurn moves the current turn through running → done/failed while persisting progress, and follow-ups reuse prior turns.",
+          code: `stateDiagram-v2
+  [*] --> idle: start()
+  idle --> running: sendTurn(message, turnId)
+  running --> running: persist sub-questions, trace, usage
+  running --> done: synthesis complete
+  running --> failed: TerminalError
+  done --> running: follow-up sendTurn (reuses journal)
+  failed --> running: new sendTurn
+  done --> [*]`,
+          code2: `stateDiagram-v2
+  [*] --> pending: planner emits sub-question
+  pending --> running: onInvestigationStart(i)
+  running --> done: onInvestigationDone(i, result)
+  done --> [*]`,
+          note: "Restate's single-writer guarantee makes <code>sendTurn</code> the only mutator while <code>getProgress</code> / <code>getResult</code> / <code>getTrace</code> / <code>getHistory</code> run as concurrent shared reads. Durable state survives server restarts.",
+        },
+        {
+          id: "journal",
+          title: "Conversation journal and compaction",
+          desc: "Refinement & reuse (Phase 7): each turn builds a journal of prior turns for the planner/synthesizer. Stale turns expire; when the journal outgrows the token budget, the compactor folds the oldest into a rolling summary.",
+          code: `flowchart TB
+  newturn["new sendTurn"] --> load["load prior turns + order"]
+  load --> filter["keep done + fresh (within FRESHNESS_TTL) + not summarized"]
+  filter --> build["buildJournal: rolling summary + verbatim turns"]
+  build --> est{"estTokens > CONTEXT_MAX_TOKENS and verbatim > MAX_JOURNAL_TURNS ?"}
+  est -- no --> use["journal -> planner + synthesizer"]
+  est -- yes --> fold["compactor folds oldest — ctx.run(compact)"]
+  fold --> persist["persist journalSummary + summarizedTurnIds"]
+  persist --> use
+  use --> reuse["planner reuses answered angles; investigates only NEW sub-questions"]
+
+  class fold,persist durable;
+  classDef durable fill:#312e81,stroke:#6366f1,color:#fff;`,
+          note: "This is reuse, not idempotency: the planner sees earlier findings and only researches new angles, so a follow-up like <code>go deeper on Snowflake margins</code> issues fewer LLM/tool calls.",
+        },
+        {
+          id: "durability",
+          title: "Durability and crash-resume",
+          desc: "The headline property. Every external effect is wrapped in ctx.run under a stable, deterministic step key, so on crash/redelivery completed steps replay from the journal instead of re-executing.",
+          code: `flowchart TB
+  step["LLM / tool call wrapped in ctx.run(stableStep)"] --> resolved{"step already in journal ?"}
+  resolved -- yes --> reuse["replay journaled result — NO external call"]
+  resolved -- no --> exec["execute side effect — OpenAI / Tavily / fetch"]
+  exec --> jrnl[("journal result under step key")]
+  jrnl --> crash{"crash / pod kill before next step ?"}
+  crash -- no --> next["continue to next step"]
+  crash -- yes --> redeliver["Restate redelivers the invocation"]
+  redeliver --> step
+  reuse --> next
+
+  class step,jrnl,reuse,exec durable;
+  classDef durable fill:#312e81,stroke:#6366f1,color:#fff;`,
+          note: "Timeouts are tuned so long LLM calls are not mistaken for hangs: the service raises <code>RESTATE_INACTIVITY_TIMEOUT_MS</code> above the longest call, while OpenAI uses a shorter per-request timeout with <code>maxRetries=0</code> — retries belong to <code>ctx.run</code>.",
+        },
+        {
+          id: "observability",
+          title: "Observability — three correlated tiers",
+          desc: "Logs, the Restate journal, and the per-turn trace all key off the same stable step names, so you can pivot across them by step name and invocation id.",
+          code: `flowchart LR
+  step["stable step name<br/>planner · synthesizer · compact<br/>investigate:i:llm:n · :tool:n:k"]
+  step --> t1["Tier-1 logs — ctx.console, replay-suppressed"]
+  step --> t2["Restate journal / UI :9070 — full args + results"]
+  step --> t3["Tier-2 trace — TraceEvent[] on Turn"]
+  t3 --> read["getTrace shared handler / npm run cli trace"]
+  t1 --> corr["correlate by step name + invocation id"]
+  t2 --> corr
+  t3 --> corr`,
+        },
+        {
+          id: "endpoints",
+          title: "Handler / endpoint map",
+          desc: "Restate services and their handlers, and which CLI command drives each. The session object is the stateful core; investigator, health and greeter are stateless services.",
+          code: `flowchart LR
+  subgraph CLI["CLI commands"]
+    c1["start"]
+    c2["turn"]
+    c3["progress"]
+    c4["trace"]
+    c5["health"]
+  end
+  subgraph SESS["session — Virtual Object"]
+    h1["start (write)"]
+    h2["sendTurn (write · single-writer)"]
+    h3["getProgress (shared)"]
+    h4["getResult (shared)"]
+    h5["getTrace (shared)"]
+    h6["getHistory (shared)"]
+  end
+  subgraph INV["investigator — Service"]
+    h7["investigate"]
+  end
+  subgraph HLTH["health — Service"]
+    h8["check"]
+  end
+  subgraph GRT["greeter — Service"]
+    h9["greet"]
+  end
+  c1 --> h1
+  c2 --> h2
+  c2 --> h3
+  c2 --> h4
+  c3 --> h3
+  c4 --> h5
+  c5 --> h8
+  h2 -->|"fan-out"| h7
+
+  class h1,h2,h3,h4,h5,h6 durable;
+  class h7,h8,h9 compute;
+  classDef durable fill:#312e81,stroke:#6366f1,color:#fff;
+  classDef compute fill:#0e7490,stroke:#22d3ee,color:#fff;`,
+        },
+        {
+          id: "journey",
+          title: "End-to-end user journey",
+          desc: "From creating a session to a cited answer and a context-reusing follow-up — the whole demo path in one view.",
+          code: `flowchart TB
+  a["npm run cli start"] --> b["session.start() -> sessionId"]
+  b --> c["npm run cli turn id 'Compare Datadog and Snowflake'"]
+  c --> d["sendTurn — fire-and-forget with turnId"]
+  d --> e["build journal from prior turns"]
+  e --> f["planner decomposes into sub-questions"]
+  f --> g["investigators run in parallel — web_search + fetch_page"]
+  g --> h["synthesizer writes cited answer"]
+  h --> i["CLI polls getProgress until done"]
+  i --> j["getResult(turnId): answer + sources + tokens + tool counts"]
+  j --> k["follow-up: 'go deeper on Snowflake margins' reuses the journal"]
+  k --> e
+
+  class b,d,e,f,h durable;
+  class g compute;
+  classDef durable fill:#312e81,stroke:#6366f1,color:#fff;
+  classDef compute fill:#0e7490,stroke:#22d3ee,color:#fff;`,
+        },
+        {
+          id: "deploy",
+          title: "Kubernetes deployment — Restate Operator",
+          desc: "Phase 11 runs the whole system on minikube. The Operator reconciles a RestateCluster (StatefulSet + PVC) and a RestateDeployment that it auto-registers and versions for zero-downtime redeploys.",
+          code: `flowchart TB
+  laptop["laptop CLI — port-forward 8080 / 9070"]
+  subgraph mk["minikube cluster"]
+    op["Restate Operator"]
+    subgraph ns["namespace: restate"]
+      rc["RestateCluster -> StatefulSet restate + Service + PVC 2Gi"]
+      secret["Secret durable-research-secrets (from .env)"]
+      cfg["ConfigMap durable-research-config"]
+      subgraph rdg["RestateDeployment durable-research"]
+        v1["ReplicaSet v1 — drains in-flight"]
+        v2["ReplicaSet v2 — new turns"]
+      end
+    end
+  end
+  op --> rc
+  op --> rdg
+  op -->|"auto-register + version"| rc
+  secret --> v2
+  cfg --> v2
+  laptop --> rc
+  rc <--> v1
+  rc <--> v2
+
+  class rc,v1,v2 durable;
+  class op,secret,cfg,laptop compute;
+  classDef durable fill:#312e81,stroke:#6366f1,color:#fff;
+  classDef compute fill:#0e7490,stroke:#22d3ee,color:#fff;`,
+          note: "On a new image tag the operator spins up <code>v2</code> and routes new invocations there while <code>v1</code> keeps running until its in-flight turns drain — a zero-downtime versioned redeploy. The PVC keeps durable state across pod restarts.",
+        },
+      ];
+
+      /* ------------------------------------------------------------------ *
+       * Tech chips                                                          *
+       * ------------------------------------------------------------------ */
+      const chips = [
+        "TypeScript · ESM · strict",
+        "Node >= 20",
+        "Restate SDK 1.14",
+        "OpenAI Responses API",
+        "Zod structured output",
+        "Tavily web_search",
+        "Readability + linkedom",
+        "Vitest",
+        "Biome",
+        "Docker (multi-stage)",
+        "Kubernetes · Restate Operator",
+      ];
+      const chipsEl = document.getElementById("chips");
+      for (const c of chips) {
+        const el = document.createElement("span");
+        el.className = "chip";
+        el.textContent = c;
+        chipsEl.appendChild(el);
+      }
+
+      /* ------------------------------------------------------------------ *
+       * Build nav + section cards                                           *
+       * ------------------------------------------------------------------ */
+      const navEl = document.getElementById("navLinks");
+      const mainEl = document.getElementById("sections");
+
+      sections.forEach((s, idx) => {
+        const n = String(idx + 1).padStart(2, "0");
+
+        const link = document.createElement("a");
+        link.href = "#" + s.id;
+        link.textContent = s.title;
+        link.dataset.target = s.id;
+        navEl.appendChild(link);
+
+        const card = document.createElement("section");
+        card.className = "card";
+        card.id = s.id;
+
+        const head = document.createElement("div");
+        head.className = "sec-head";
+        head.innerHTML =
+          '<div class="badge">' +
+          n +
+          '</div><div><h2>' +
+          s.title +
+          "</h2><p>" +
+          s.desc +
+          "</p></div>";
+        card.appendChild(head);
+
+        const codes = [s.code, s.code2].filter(Boolean);
+        for (const code of codes) {
+          const dia = document.createElement("div");
+          dia.className = "diagram";
+          const m = document.createElement("div");
+          m.className = "mermaid";
+          m.dataset.src = code;
+          dia.appendChild(m);
+          card.appendChild(dia);
+        }
+
+        if (s.note) {
+          const note = document.createElement("div");
+          note.className = "note";
+          note.innerHTML = s.note;
+          card.appendChild(note);
+        }
+
+        mainEl.appendChild(card);
+      });
+
+      /* ------------------------------------------------------------------ *
+       * Mermaid theming + rendering                                         *
+       * ------------------------------------------------------------------ */
+      const darkVars = {
+        primaryColor: "#1b2742",
+        primaryTextColor: "#e8eefb",
+        primaryBorderColor: "#5b6bd6",
+        lineColor: "#7c8bbd",
+        secondaryColor: "#123244",
+        tertiaryColor: "#15203b",
+        tertiaryTextColor: "#e8eefb",
+        clusterBkg: "rgba(20,28,51,0.45)",
+        clusterBorder: "#3a4a78",
+        titleColor: "#e8eefb",
+        nodeTextColor: "#e8eefb",
+        actorBkg: "#1b2742",
+        actorBorder: "#5b6bd6",
+        actorTextColor: "#e8eefb",
+        signalColor: "#aab6d4",
+        signalTextColor: "#cdd7ef",
+        labelBoxBkgColor: "#15203b",
+        labelTextColor: "#e8eefb",
+        loopTextColor: "#cdd7ef",
+        noteBkgColor: "#243154",
+        noteTextColor: "#e8eefb",
+        noteBorderColor: "#3a4a78",
+        edgeLabelBackground: "#0d1530",
+      };
+      const lightVars = {
+        primaryColor: "#eef2ff",
+        primaryTextColor: "#111a30",
+        primaryBorderColor: "#6366f1",
+        lineColor: "#8794b6",
+        secondaryColor: "#cffafe",
+        tertiaryColor: "#f1f5f9",
+        tertiaryTextColor: "#111a30",
+        clusterBkg: "rgba(255,255,255,0.6)",
+        clusterBorder: "#c3ccea",
+        titleColor: "#111a30",
+        nodeTextColor: "#111a30",
+        actorBkg: "#eef2ff",
+        actorBorder: "#6366f1",
+        actorTextColor: "#111a30",
+        signalColor: "#8794b6",
+        signalTextColor: "#44516f",
+        labelBoxBkgColor: "#eef2ff",
+        labelTextColor: "#111a30",
+        loopTextColor: "#44516f",
+        noteBkgColor: "#e9edfb",
+        noteTextColor: "#111a30",
+        noteBorderColor: "#c3ccea",
+        edgeLabelBackground: "#eef1f8",
+      };
+
+      let renderPass = 0;
+
+      async function renderDiagrams(theme) {
+        renderPass += 1;
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: "base",
+          securityLevel: "loose",
+          fontFamily: "Inter, system-ui, sans-serif",
+          themeVariables: theme === "dark" ? darkVars : lightVars,
+          flowchart: { curve: "basis", htmlLabels: true, padding: 14 },
+          sequence: { useMaxWidth: true, mirrorActors: false },
+        });
+
+        const nodes = Array.from(document.querySelectorAll(".mermaid"));
+        await Promise.all(
+          nodes.map(async (node, i) => {
+            const src = node.dataset.src;
+            const id = "mmd-" + renderPass + "-" + i;
+            try {
+              const { svg } = await mermaid.render(id, src);
+              node.innerHTML = svg;
+            } catch (err) {
+              node.innerHTML =
+                '<div class="mmd-error">Diagram failed to render:\n' +
+                String(err && err.message ? err.message : err) +
+                "</div>";
+            }
+          }),
+        );
+      }
+
+      /* ------------------------------------------------------------------ *
+       * Theme toggle                                                        *
+       * ------------------------------------------------------------------ */
+      const root = document.documentElement;
+      const toggle = document.getElementById("themeToggle");
+      const icon = document.getElementById("themeIcon");
+      const label = document.getElementById("themeLabel");
+
+      function applyThemeUI(theme) {
+        const next = theme === "dark" ? "Light" : "Dark";
+        label.textContent = next;
+        icon.textContent = theme === "dark" ? "☀" : "☾";
+      }
+
+      const prefersLight =
+        window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
+      let theme = prefersLight ? "light" : "dark";
+      root.setAttribute("data-theme", theme);
+      applyThemeUI(theme);
+
+      toggle.addEventListener("click", async () => {
+        theme = theme === "dark" ? "light" : "dark";
+        root.setAttribute("data-theme", theme);
+        applyThemeUI(theme);
+        await renderDiagrams(theme);
+      });
+
+      /* ------------------------------------------------------------------ *
+       * Scroll progress + active-section highlighting                       *
+       * ------------------------------------------------------------------ */
+      const progress = document.getElementById("progress");
+      window.addEventListener(
+        "scroll",
+        () => {
+          const h = document.documentElement;
+          const scrolled = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+          progress.style.width = scrolled + "%";
+        },
+        { passive: true },
+      );
+
+      const linkByTarget = new Map(
+        Array.from(navEl.querySelectorAll("a")).map((a) => [a.dataset.target, a]),
+      );
+      const observer = new IntersectionObserver(
+        (entries) => {
+          for (const e of entries) {
+            if (e.isIntersecting) {
+              for (const a of linkByTarget.values()) a.classList.remove("active");
+              const active = linkByTarget.get(e.target.id);
+              if (active) {
+                active.classList.add("active");
+                // Center the active link in the horizontally-scrollable nav
+                // WITHOUT scrolling the document. scrollIntoView on a child of
+                // the sticky nav makes the browser yank the page vertically,
+                // which fought the user's scroll and made the page feel stuck.
+                const linkRect = active.getBoundingClientRect();
+                const navRect = navEl.getBoundingClientRect();
+                const delta =
+                  linkRect.left + linkRect.width / 2 - (navRect.left + navRect.width / 2);
+                navEl.scrollBy({ left: delta, behavior: "smooth" });
+              }
+            }
+          }
+        },
+        { rootMargin: "-45% 0px -50% 0px" },
+      );
+      for (const s of sections) {
+        const el = document.getElementById(s.id);
+        if (el) observer.observe(el);
+      }
+
+      /* Initial render */
+      await renderDiagrams(theme);
+    </script>
+  </body>
+</html>
