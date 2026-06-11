@@ -9,6 +9,9 @@ import type { Progress, TokenUsage, Turn } from "./session/types.js";
 export function renderProgress(p: Progress): string {
   const header = `[${p.status}] ${p.message ?? "(no active turn)"}`;
   const lines = p.subQuestions.map((sq) => `  - [${sq.status}] ${sq.q}`);
+  if (p.compacting) {
+    lines.push("  (compacting prior context…)");
+  }
   return [header, ...lines].join("\n");
 }
 
@@ -61,6 +64,17 @@ export function formatTurnResult(turn: Turn): string {
     for (const [name, count] of Object.entries(turn.toolCalls)) {
       parts.push(`  - ${name}: ${count}`);
     }
+  }
+
+  if (turn.context) {
+    const c = turn.context;
+    parts.push("\nContext (this turn):");
+    parts.push(
+      `  - reused ${c.priorTurnsUsed} prior turn(s); investigated ${turn.subQuestions.length} new sub-question(s)`,
+    );
+    parts.push(
+      `  - journal ~${c.estimatedTokens} / ${c.budgetTokens} tokens${c.compacted ? " (compacted this turn)" : ""}`,
+    );
   }
 
   return parts.join("\n");

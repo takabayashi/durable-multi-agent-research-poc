@@ -13,10 +13,23 @@ describe("renderProgress", () => {
         { q: "What is A?", status: "done" },
         { q: "What is B?", status: "running" },
       ],
+      compacting: false,
     };
     expect(renderProgress(p)).toBe(
       "[running] Compare A and B\n  - [done] What is A?\n  - [running] What is B?",
     );
+  });
+
+  it("appends a compaction indicator while compacting", () => {
+    const p: Progress = {
+      sessionId: "s1",
+      status: "running",
+      currentTurnId: "t1",
+      message: "follow-up",
+      subQuestions: [],
+      compacting: true,
+    };
+    expect(renderProgress(p)).toContain("(compacting prior context");
   });
 
   it("falls back to a placeholder when there is no active turn", () => {
@@ -26,6 +39,7 @@ describe("renderProgress", () => {
       currentTurnId: null,
       message: null,
       subQuestions: [],
+      compacting: false,
     };
     expect(renderProgress(p)).toBe("[idle] (no active turn)");
   });
@@ -88,5 +102,20 @@ describe("formatTurnResult", () => {
         "  - fetch_page: 3",
       ].join("\n"),
     );
+  });
+
+  it("includes a context line when the turn carries a context snapshot", () => {
+    const turn: Turn = {
+      turnId: "t2",
+      message: "go deeper",
+      status: "done",
+      subQuestions: [{ q: "deeper angle?", status: "done" }],
+      answer: { text: "deeper answer", citations: [] },
+      context: { priorTurnsUsed: 2, estimatedTokens: 1500, budgetTokens: 6000, compacted: true },
+      createdAt: 0,
+    };
+    const out = formatTurnResult(turn);
+    expect(out).toContain("reused 2 prior turn(s); investigated 1 new sub-question(s)");
+    expect(out).toContain("journal ~1500 / 6000 tokens (compacted this turn)");
   });
 });
