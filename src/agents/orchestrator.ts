@@ -45,9 +45,12 @@ export async function runResearch(
   ctx: restate.Context,
   question: string,
   hooks: ResearchHooks,
+  journal = "",
 ): Promise<Answer> {
-  // 1) Plan: decompose the question, or answer a trivial one directly.
-  const planned = await plan(ctx, question);
+  // 1) Plan: using the conversation journal, emit only the NEW sub-questions
+  //    still needed (possibly none — the journal may already suffice), or answer
+  //    a trivial message directly.
+  const planned = await plan(ctx, question, journal);
   hooks.onUsage(planned.usage);
 
   if (planned.plan.trivial) {
@@ -85,8 +88,9 @@ export async function runResearch(
     }
   }
 
-  // 3) Synthesize a structured, cited answer.
-  const synthesis = await synthesize(ctx, question, subResults);
+  // 3) Synthesize a structured, cited answer, reusing the journal for continuity
+  //    (subResults may be empty when the journal already covers the message).
+  const synthesis = await synthesize(ctx, question, subResults, journal);
   hooks.onUsage(synthesis.usage);
   return synthesis.answer;
 }

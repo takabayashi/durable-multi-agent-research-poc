@@ -5,11 +5,18 @@ describe("plannerInput", () => {
   it("substitutes the breadth cap and frames the question as untrusted data", () => {
     const [system, user] = plannerInput("Compare A and B", 4);
     expect(system?.role).toBe("system");
-    expect(system?.content).toContain("between 2 and 4");
+    expect(system?.content).toContain("up to 4");
     expect(system?.content).not.toContain("{MAX}");
     expect(user?.role).toBe("user");
     expect(user?.content).toContain("Compare A and B");
     expect(user?.content.toLowerCase()).toContain("untrusted data");
+  });
+
+  it("includes a CONVERSATION block only when a journal is provided", () => {
+    expect(plannerInput("Q", 3)[1]?.content).not.toContain("CONVERSATION");
+    const withJournal = plannerInput("Q", 3, "User asked: earlier question")[1]?.content ?? "";
+    expect(withJournal).toContain("CONVERSATION");
+    expect(withJournal).toContain("earlier question");
   });
 
   it("anchors the trivial decision with both trivial and non-trivial examples", () => {

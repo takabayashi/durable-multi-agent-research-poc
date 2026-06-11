@@ -12,16 +12,21 @@ export interface PlanResult {
 }
 
 /**
- * Decompose a question into bounded sub-questions, or flag it trivial for a
- * direct answer. One durable LLM step named "planner".
+ * Decompose a message into bounded NEW sub-questions, reusing the conversation
+ * journal (so already-answered angles aren't re-investigated), or flag it
+ * trivial for a direct answer. One durable LLM step named "planner".
  */
-export async function plan(ctx: restate.Context, question: string): Promise<PlanResult> {
+export async function plan(
+  ctx: restate.Context,
+  question: string,
+  journal = "",
+): Promise<PlanResult> {
   const { data, usage } = await callStructured(ctx, {
     step: "planner",
     model: PLANNER_MODEL,
     schema: PlanSchema,
     schemaName: "research_plan",
-    input: plannerInput(question, MAX_SUBQUESTIONS),
+    input: plannerInput(question, MAX_SUBQUESTIONS, journal),
   });
 
   return { plan: applyBreadthCap(data, MAX_SUBQUESTIONS), usage };
