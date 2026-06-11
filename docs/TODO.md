@@ -191,17 +191,24 @@ independently verifiable, and ends in a runnable state.
 ## Phase 11 — Local Kubernetes (minikube) deployment
 
 > Goal: run the whole system on local minikube and demonstrate in-cluster resume.
+>
+> Scope note: deployed via the **Restate Operator** (`RestateCluster` + `RestateDeployment`) rather
+> than the bare Helm chart, so registration and versioning are automatic; the centerpiece demo is a
+> zero-downtime versioned redeploy (the old version drains its in-flight work). See
+> `docs/decisions.md` ("Phase 11"). Manifests in `k8s/`; ops docs in `docs/runbooks.md` +
+> `docs/k8s-troubleshooting.md`. Boxes are ticked after a live minikube validation.
 
 - [ ] Build the service image and load it into minikube (`minikube image load`).
-- [ ] Deploy Restate via its Helm chart (single-node `StatefulSet` + default `standard` PVC).
-- [ ] Deploy the service `Deployment` + `Service`; register the deployment with Restate.
-- [ ] Demonstrate pod-kill resume locally (service pod and/or Restate pod; PVC persists state).
+- [ ] Install the Restate Operator; deploy the Restate server via a `RestateCluster` (single-node `StatefulSet` + `standard` PVC).
+- [ ] Deploy the service as a `RestateDeployment` (the operator auto-registers + versions it).
+- [ ] Demonstrate a zero-downtime versioned redeploy (old version drains in-flight invocations) and pod-kill resume (service pod and/or Restate pod; PVC persists state).
 - [ ] **Security:** keys provided via a Kubernetes `Secret` (from `.env`), never baked into the image.
-- [ ] **Docs:** README "deploy on minikube" with exact commands.
+- [ ] **Docs:** README "deploy on minikube (Operator)"; operator-aware runbooks + a top-10 troubleshooting guide.
 
 **Acceptance criteria**
-- [ ] `kubectl get pods` shows Restate + the service running on minikube.
+- [ ] `kubectl get pods` shows the operator, Restate, and the service running on minikube.
 - [ ] A research turn completes end-to-end through the in-cluster Restate ingress.
+- [ ] A mid-research versioned redeploy completes the in-flight turn on the old version while new turns use the new version (no dropped/duplicated work).
 - [ ] Deleting the service pod mid-research resumes the turn after the pod restarts.
 
 ## Phase 12 — Design note, README & final polish

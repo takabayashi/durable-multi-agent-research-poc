@@ -277,13 +277,70 @@ npm test
 ## Build the container
 
 ```bash
-docker build -t durable-research .
+docker build --platform linux/arm64 -t durable-research .
 docker run --rm -p 9080:9080 durable-research
 # expect: "Restate SDK started listening on 9080..."
 ```
 
 The image is multi-stage (build then a slim runtime), runs as a non-root user, and exposes `9080`.
 Register it with a running Restate server exactly as in "Run locally".
+
+## Deploy on minikube (Operator)
+
+Run the whole system on a local Kubernetes cluster using the [Restate
+Operator](https://docs.restate.dev/guides/restate-on-kind-with-operator): it deploys the Restate
+server (a `RestateCluster` → single-node StatefulSet + PVC) and the service (a `RestateDeployment`),
+and **auto-registers + versions** the service — no manual `restate deployments register`. Manifests
+live in [`k8s/`](k8s/); full procedures (deploy, roll out + roll back, recover, rotate keys, resume,
+teardown) are in [`docs/runbooks.md`](docs/runbooks.md), and the top-10 failure guide is in
+[`docs/k8s-troubleshooting.md`](docs/k8s-troubleshooting.md).
+
+Prerequisites: Docker, `minikube`, `kubectl`, `helm` (the `restate` CLI is optional). Set
+`OPENAI_API_KEY` + `TAVILY_API_KEY` in `.env`.
+
+```bash
+# cluster + operator
+minikube start --cpus=4 --memory=6144
+helm install restate-operator oci://ghcr.io/restatedev/restate-operator-helm \
+  --namespace restate-operator --create-namespace
+
+# Restate server (operator creates the StatefulSet + Service + PVC in ns restate)
+kubectl apply -f k8s/restate-cluster.yaml
+kubectl -n restate rollout status statefulset/restate --timeout=180s
+
+# build + load the service image into the cluster (--platform matches the arm64 node)
+docker build --platform linux/arm64 -t durable-research:0.1.0 .
+minikube image load durable-research:0.1.0
+
+# API keys via a Secret (from .env, never in the image) + non-secret config
+set -a; source .env; set +a
+kubectl -n restate create secret generic durable-research-secrets \
+  --from-literal=OPENAI_API_KEY="$OPENAI_API_KEY" \
+  --from-literal=TAVILY_API_KEY="$TAVILY_API_KEY"
+kubectl apply -f k8s/config.yaml
+
+# deploy the service (auto-registered by the operator)
+kubectl apply -f k8s/restate-deployment.yaml
+```
+
+Drive it from your laptop by port-forwarding the Restate ingress (and UI at
+<http://localhost:9070>):
+
+```bash
+kubectl -n restate port-forward svc/restate 8080:8080 9070:9070
+RESTATE_INGRESS_URL=http://localhost:8080 npm run cli start
+RESTATE_INGRESS_URL=http://localhost:8080 npm run cli turn <sessionId> "Compare Datadog and Snowflake over the last three years"
+```
+
+**Durability demos.** With a turn in flight: bump the image tag and re-apply the `RestateDeployment`
+to watch a **zero-downtime versioned redeploy** (the old version drains its in-flight turn while new
+turns go to the new version), or delete the service pod (`kubectl -n restate delete pod -l
+app=durable-research`) to watch the turn **resume via journal replay**. Step-by-step in
+[`docs/runbooks.md`](docs/runbooks.md).
+
+Secrets are injected via a Kubernetes `Secret` built from `.env` and are never baked into the image;
+on minikube the cluster's NetworkPolicies are disabled (the default CNI doesn't enforce them) — keep
+them on in production. See [`docs/decisions.md`](docs/decisions.md).
 
 ## Rotating keys
 

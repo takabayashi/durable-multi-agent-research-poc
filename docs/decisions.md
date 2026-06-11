@@ -550,3 +550,50 @@ that references it).
   simpler than a custom transport for a POC. `DEBUG` surfaces the truncated LLM-output previews.
 - **Made by:** Human+Agent
 - **Date:** 2026-06-10
+
+## Phase 11 — Local Kubernetes (minikube) deployment
+
+### Deploy via the Restate Operator (not the bare Helm chart)
+- **Decision:** Deploy on minikube using the **Restate Operator** with a `RestateCluster`
+  (single-node StatefulSet + PVC) and a `RestateDeployment` for the service; the operator
+  auto-registers the service and manages versioning/draining. Manifests in [`k8s/`](../k8s/).
+- **Alternatives:** the bare Restate Helm chart + a plain `Deployment`/`Service` + manual
+  `restate deployments register` (Approach A, drafted in the Phase 11 plan history).
+- **Rationale / trade-offs:** version-draining (keep the old service version alive until its
+  in-flight invocations finish) is the strongest, on-theme demonstration of the durability thesis
+  — redeploy mid-research with zero dropped/duplicated work — and removes the manual registration
+  step. Costs a cluster-scoped operator + 3 CRDs and the cluster-owns-a-namespace model;
+  "recommended" is aimed at real clusters, accepted here for the demo value. The Helm-chart
+  approach remains a documented fallback.
+- **Made by:** Human+Agent
+- **Date:** 2026-06-11
+
+### NetworkPolicies off locally; keys via Secret + config via ConfigMap; single namespace
+- **Decision:** Set `spec.security.disableNetworkPolicies: true` on the `RestateCluster` for local
+  minikube; inject the two API keys via a `durable-research-secrets` Secret built from `.env` (never
+  in the image) and non-secret tuning via a `durable-research-config` ConfigMap, both consumed with
+  `envFrom`; run the cluster and the app in a single `restate` namespace; load the image with
+  `minikube image load` + `imagePullPolicy: IfNotPresent`.
+- **Alternatives:** enforce NetworkPolicies locally (needs a policy CNI like Calico + an
+  `allow.restate.dev/<name>` namespace label); one combined Secret for all config; a separate app
+  namespace registering cross-namespace; a remote registry pull.
+- **Rationale / trade-offs:** minikube's default CNI doesn't enforce NetworkPolicy, so disabling
+  makes behavior explicit and CNI-independent (matches Restate's official local guide); the
+  Secret/ConfigMap split keeps secrets out of git and config reviewable; a single namespace mirrors
+  the tested guide and avoids cross-namespace/ordering surprises. Production posture (policies on,
+  app in a labelled namespace) is deferred.
+- **Made by:** Human+Agent
+- **Date:** 2026-06-11
+
+### Operator-aware runbooks + realigned troubleshooting guide
+- **Decision:** Ship [`docs/runbooks.md`](./runbooks.md) (deploy, roll out + roll back, recover a
+  stuck invocation, rotate keys, resume after pod loss, teardown) and realign
+  [`docs/k8s-troubleshooting.md`](./k8s-troubleshooting.md) to the Operator topology/naming, curated
+  to a top 10.
+- **Supersedes:** the earlier `docs/k8s-troubleshooting.md` written for the Helm /
+  manual-registration approach (old `research-poc` naming, default namespace).
+- **Alternatives:** keep the Approach-A guide as-is and add a separate operator guide.
+- **Rationale / trade-offs:** one guide matching the shipped approach is less confusing than two;
+  the reusable command cheat sheet + 30-second triage loop were preserved.
+- **Made by:** Human+Agent
+- **Date:** 2026-06-11
