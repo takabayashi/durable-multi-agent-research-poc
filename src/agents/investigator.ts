@@ -1,7 +1,8 @@
 import * as restate from "@restatedev/restate-sdk";
 import type OpenAI from "openai";
+import { truncate } from "../llm/format.js";
 import { callTools } from "../llm/wrapper.js";
-import type { SubResult, TokenUsage } from "../session/types.js";
+import type { SubResult, TokenUsage, TraceEvent } from "../session/types.js";
 import { collectSources, type FoundSource, runTool, TOOL_DEFS } from "../tools/registry.js";
 import { investigatorInput } from "./investigator.prompt.js";
 
@@ -25,6 +26,8 @@ export interface InvestigationResult {
   usage: TokenUsage[];
   /** Names of tools invoked during this investigation (e.g. "web_search"). */
   toolCalls: string[];
+  /** Ordered Tier-2 trace fragment for this investigation (steps namespaced by index). */
+  trace: TraceEvent[];
 }
 
 /**
@@ -48,17 +51,33 @@ export const investigator = restate.service({
       const usage: TokenUsage[] = [];
       const found: FoundSource[] = [];
       const toolCalls: string[] = [];
+      const trace: TraceEvent[] = [];
       let findings = "";
 
       for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
+        const step = `investigate:${index}:llm:${turn}`;
         const res = await callTools(ctx, {
-          step: `llm:${turn}`,
+          step,
           model: INVESTIGATOR_MODEL,
           input: conversation,
           tools: TOOL_DEFS,
         });
         usage.push(res.usage);
         conversation.push(...res.outputItems);
+        trace.push({
+          step,
+          kind: "llm",
+          model: INVESTIGATOR_MODEL,
+          tokens: {
+            in: res.usage.inputTokens,
+            cached: res.usage.cachedTokens,
+            out: res.usage.outputTokens,
+          },
+          detail:
+            res.functionCalls.length > 0
+              ? `requested ${res.functionCalls.length} tool call(s)`
+              : truncate(res.text, 200),
+        });
 
         if (res.functionCalls.length === 0) {
           findings = res.text;
@@ -66,11 +85,17 @@ export const investigator = restate.service({
         }
 
         for (const [callIdx, call] of res.functionCalls.entries()) {
-          const outcome = await ctx.run(`tool:${turn}:${callIdx}`, () =>
-            runTool(call.name, call.args),
-          );
+          const toolStep = `investigate:${index}:tool:${turn}:${callIdx}`;
+          const outcome = await ctx.run(toolStep, () => runTool(call.name, call.args));
           toolCalls.push(call.name);
           found.push(...outcome.found);
+          // Tier-1 tool log: stable step name + tool name (args/results stay in the journal).
+          ctx.console.info(`tool step=${toolStep} name=${call.name}`);
+          trace.push({
+            step: toolStep,
+            kind: "tool",
+            detail: `${call.name}: ${truncate(call.args, 120)}`,
+          });
           conversation.push({
             type: "function_call_output",
             call_id: call.callId,
@@ -80,8 +105,9 @@ export const investigator = restate.service({
       }
 
       if (!findings) {
+        const step = `investigate:${index}:llm:final`;
         const res = await callTools(ctx, {
-          step: "llm:final",
+          step,
           model: INVESTIGATOR_MODEL,
           input: [
             ...conversation,
@@ -91,12 +117,24 @@ export const investigator = restate.service({
         });
         usage.push(res.usage);
         findings = res.text || "(no findings: investigation did not converge)";
+        trace.push({
+          step,
+          kind: "llm",
+          model: INVESTIGATOR_MODEL,
+          tokens: {
+            in: res.usage.inputTokens,
+            cached: res.usage.cachedTokens,
+            out: res.usage.outputTokens,
+          },
+          detail: truncate(findings, 200),
+        });
       }
 
       return {
         result: { q: question, findings, sources: collectSources(found, index) },
         usage,
         toolCalls,
+        trace,
       };
     },
   },

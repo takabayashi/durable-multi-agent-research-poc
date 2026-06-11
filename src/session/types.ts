@@ -40,6 +40,22 @@ export interface TokenUsage {
   outputTokens: number;
 }
 
+/**
+ * One Tier-2 trace event: a single durable LLM or tool step in a turn's
+ * transcript. The `step` is the same stable name used in the journal + logs
+ * (e.g. "planner", "investigate:0:llm:1", "investigate:0:tool:1:0",
+ * "synthesizer", "compact"), so the three surfaces correlate. Stored truncated
+ * and secret-free on the Turn and exposed via getTrace.
+ */
+export interface TraceEvent {
+  step: string;
+  kind: "plan" | "investigate" | "llm" | "tool" | "synthesize" | "compact";
+  /** Truncated, secret-free, human-readable detail. */
+  detail: string;
+  model?: string;
+  tokens?: { in: number; cached: number; out: number };
+}
+
 /** Per-turn snapshot of the conversation context fed to the planner/synthesizer. */
 export interface TurnContext {
   /** Prior turns represented in the journal (verbatim + folded into the summary). */
@@ -63,6 +79,8 @@ export interface Turn {
   toolCalls?: Record<string, number>;
   /** Conversation-context snapshot for this turn (journal size, reuse, compaction). */
   context?: TurnContext;
+  /** Tier-2 ordered transcript of this turn's LLM/tool steps (truncated, secret-free). */
+  trace?: TraceEvent[];
   createdAt: number;
 }
 

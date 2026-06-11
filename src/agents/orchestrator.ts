@@ -1,5 +1,6 @@
 import * as restate from "@restatedev/restate-sdk";
-import type { Answer, SubResult, TokenUsage } from "../session/types.js";
+import { truncate } from "../llm/format.js";
+import type { Answer, SubResult, TokenUsage, TraceEvent } from "../session/types.js";
 import { investigator } from "./investigator.js";
 import { plan } from "./planner.js";
 import { synthesize } from "./synthesizer.js";
@@ -32,6 +33,8 @@ export interface ResearchHooks {
   onInvestigationStart(index: number): void;
   /** Investigation of the i-th sub-question has finished. */
   onInvestigationDone(index: number, result: SubResult): void;
+  /** Ordered Tier-2 trace events (plan / investigation fragment / synthesis). */
+  onTrace(events: TraceEvent[]): void;
 }
 
 /**
@@ -52,6 +55,21 @@ export async function runResearch(
   //    a trivial message directly.
   const planned = await plan(ctx, question, journal);
   hooks.onUsage(planned.usage);
+  hooks.onTrace([
+    {
+      step: "planner",
+      kind: "plan",
+      model: planned.usage.model,
+      tokens: {
+        in: planned.usage.inputTokens,
+        cached: planned.usage.cachedTokens,
+        out: planned.usage.outputTokens,
+      },
+      detail: planned.plan.trivial
+        ? "trivial → direct answer"
+        : `planned ${planned.plan.subQuestions.length} sub-question(s)`,
+    },
+  ]);
 
   if (planned.plan.trivial) {
     return { text: planned.plan.directAnswer, citations: [] };
@@ -72,7 +90,7 @@ export async function runResearch(
         ctx.serviceClient(investigator).investigate({ question: q, index: i }),
       ),
     );
-    for (const [k, { i }] of group.entries()) {
+    for (const [k, { q, i }] of group.entries()) {
       const r = settled[k];
       if (!r) {
         continue;
@@ -83,6 +101,15 @@ export async function runResearch(
       for (const name of r.toolCalls) {
         hooks.onToolCall(name);
       }
+      hooks.onTrace([
+        { step: `investigate:${i}`, kind: "investigate", detail: q },
+        ...r.trace,
+        {
+          step: `investigate:${i}:done`,
+          kind: "investigate",
+          detail: `${r.result.sources.length} source(s)`,
+        },
+      ]);
       hooks.onInvestigationDone(i, r.result);
       subResults.push(r.result);
     }
@@ -92,5 +119,18 @@ export async function runResearch(
   //    (subResults may be empty when the journal already covers the message).
   const synthesis = await synthesize(ctx, question, subResults, journal);
   hooks.onUsage(synthesis.usage);
+  hooks.onTrace([
+    {
+      step: "synthesizer",
+      kind: "synthesize",
+      model: synthesis.usage.model,
+      tokens: {
+        in: synthesis.usage.inputTokens,
+        cached: synthesis.usage.cachedTokens,
+        out: synthesis.usage.outputTokens,
+      },
+      detail: `${truncate(synthesis.answer.text, 200)} (${synthesis.answer.citations.length} citation(s))`,
+    },
+  ]);
   return synthesis.answer;
 }

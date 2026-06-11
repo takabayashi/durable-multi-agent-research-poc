@@ -2,7 +2,8 @@ import * as restate from "@restatedev/restate-sdk";
 import { compact } from "../agents/compactor.js";
 import { buildJournal, isFresh } from "../agents/journal.js";
 import { runResearch } from "../agents/orchestrator.js";
-import type { Progress, TokenUsage, Turn, TurnContext } from "./types.js";
+import { truncate } from "../llm/format.js";
+import type { Progress, TokenUsage, TraceEvent, Turn, TurnContext } from "./types.js";
 
 // Long LLM steps (planner/synthesizer) make no journal progress while in flight,
 // so raise Restate's inactivity timeout above the longest expected call; the
@@ -21,6 +22,9 @@ const FRESHNESS_TTL_MS = Number(process.env.FRESHNESS_TTL ?? 3600) * 1000;
 const MAX_JOURNAL_TURNS = Number(process.env.MAX_JOURNAL_TURNS ?? 3);
 const CONTEXT_MAX_TOKENS = Number(process.env.CONTEXT_MAX_TOKENS ?? 6000);
 const JOURNAL_MAX_CHARS_PER_TURN = Number(process.env.JOURNAL_MAX_CHARS_PER_TURN ?? 1200);
+
+// Tier-2 per-turn trace bound: cap stored TraceEvents so session state stays small.
+const TRACE_MAX_EVENTS = Number(process.env.TRACE_MAX_EVENTS ?? 500);
 
 interface SendTurnInput {
   message: string;
@@ -49,6 +53,7 @@ async function buildSessionJournal(
   currentTurnId: string,
   now: number,
   usage: TokenUsage[],
+  trace: TraceEvent[],
   persist: () => void,
 ): Promise<{ text: string; context: TurnContext }> {
   let summary = (await ctx.get<string>("journalSummary")) ?? "";
@@ -70,6 +75,17 @@ async function buildSessionJournal(
     const toFold = verbatim.slice(0, verbatim.length - MAX_JOURNAL_TURNS);
     const result = await compact(ctx, summary, toFold);
     usage.push(result.usage);
+    trace.push({
+      step: "compact",
+      kind: "compact",
+      model: result.usage.model,
+      tokens: {
+        in: result.usage.inputTokens,
+        cached: result.usage.cachedTokens,
+        out: result.usage.outputTokens,
+      },
+      detail: `folded ${toFold.length} older turn(s) into the summary`,
+    });
     persist();
 
     summary = result.summary;
@@ -134,6 +150,7 @@ export const session = restate.object({
       const turnId = input?.turnId ?? ctx.rand.uuidv4();
       const usage: TokenUsage[] = [];
       const toolCalls: Record<string, number> = {};
+      const trace: TraceEvent[] = [];
       const turn: Turn = {
         turnId,
         message,
@@ -141,6 +158,7 @@ export const session = restate.object({
         subQuestions: [],
         usage,
         toolCalls,
+        trace,
         createdAt: now,
       };
 
@@ -151,13 +169,25 @@ export const session = restate.object({
       ctx.set("turns", turns);
       ctx.set("order", order);
       ctx.set("currentTurnId", turnId);
+      ctx.console.info(
+        `turn start session=${ctx.key} turn=${turnId} msg="${truncate(message, 120)}"`,
+      );
 
       const persist = () => ctx.set("turns", turns);
 
       // Assemble the conversation journal from prior turns (compacting if it has
       // outgrown the token budget), so the planner/synthesizer reuse and build on
       // earlier work instead of restarting.
-      const journal = await buildSessionJournal(ctx, turns, order, turnId, now, usage, persist);
+      const journal = await buildSessionJournal(
+        ctx,
+        turns,
+        order,
+        turnId,
+        now,
+        usage,
+        trace,
+        persist,
+      );
       turn.context = journal.context;
       persist();
 
@@ -196,15 +226,26 @@ export const session = restate.object({
                 persist();
               }
             },
+            onTrace: (events) => {
+              trace.push(...events);
+              if (trace.length > TRACE_MAX_EVENTS) {
+                trace.splice(0, trace.length - TRACE_MAX_EVENTS);
+              }
+              persist();
+            },
           },
           journal.text,
         );
         turn.status = "done";
         persist();
+        ctx.console.info(
+          `turn done session=${ctx.key} turn=${turnId} subq=${turn.subQuestions.length}`,
+        );
         return { turnId };
       } catch (err) {
         turn.status = "failed";
         persist();
+        ctx.console.warn(`turn failed session=${ctx.key} turn=${turnId}`);
         throw err;
       }
     },
@@ -233,6 +274,18 @@ export const session = restate.object({
         const turns = await loadTurns(ctx);
         const id = input?.turnId ?? (await ctx.get<string>("currentTurnId"));
         return id ? (turns[id] ?? null) : null;
+      },
+    ),
+
+    getTrace: restate.handlers.object.shared(
+      async (
+        ctx: restate.ObjectSharedContext,
+        input: { turnId?: string } = {},
+      ): Promise<TraceEvent[]> => {
+        const turns = await loadTurns(ctx);
+        const id = input?.turnId ?? (await ctx.get<string>("currentTurnId"));
+        const turn = id ? turns[id] : undefined;
+        return turn?.trace ?? [];
       },
     ),
 
