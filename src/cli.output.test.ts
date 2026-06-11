@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aggregateUsage, formatTurnResult, renderProgress } from "./cli.output";
+import { aggregateUsage, formatTurnResult, renderProgress, renderTrace } from "./cli.output";
 import type { Progress, Turn } from "./session/types";
 
 describe("renderProgress", () => {
@@ -117,5 +117,33 @@ describe("formatTurnResult", () => {
     const out = formatTurnResult(turn);
     expect(out).toContain("reused 2 prior turn(s); investigated 1 new sub-question(s)");
     expect(out).toContain("journal ~1500 / 6000 tokens (compacted this turn)");
+  });
+});
+
+describe("renderTrace", () => {
+  it("returns a placeholder when there are no events", () => {
+    expect(renderTrace([])).toBe("(no trace recorded for this turn)");
+  });
+
+  it("renders an ordered transcript with step, kind, model/tokens and detail", () => {
+    const out = renderTrace([
+      {
+        step: "planner",
+        kind: "plan",
+        model: "gpt-x",
+        tokens: { in: 10, cached: 2, out: 5 },
+        detail: "planned 1 sub-question(s)",
+      },
+      { step: "investigate:0:tool:0:0", kind: "tool", detail: "web_search: datadog" },
+    ]);
+    expect(out).toBe(
+      [
+        "Trace (2 events):",
+        "  - planner [plan] gpt-x in=10 cached=2 out=5",
+        "      planned 1 sub-question(s)",
+        "  - investigate:0:tool:0:0 [tool]",
+        "      web_search: datadog",
+      ].join("\n"),
+    );
   });
 });

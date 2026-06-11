@@ -3,7 +3,7 @@
  * stays thin (routing + Restate IO) and this formatting is unit-testable. These
  * functions are pure (data in, string out) — callers own the actual console IO.
  */
-import type { Progress, TokenUsage, Turn } from "./session/types.js";
+import type { Progress, TokenUsage, TraceEvent, Turn } from "./session/types.js";
 
 /** Render a one-shot progress snapshot: a status header plus its sub-questions. */
 export function renderProgress(p: Progress): string {
@@ -13,6 +13,29 @@ export function renderProgress(p: Progress): string {
     lines.push("  (compacting prior context…)");
   }
   return [header, ...lines].join("\n");
+}
+
+/**
+ * Render a turn's Tier-2 trace as an ordered, readable transcript: each event's
+ * stable step name + kind (and model/tokens for LLM steps) with a truncated
+ * detail line. The step names mirror the journal + logs, so the three correlate.
+ */
+export function renderTrace(events: TraceEvent[]): string {
+  if (events.length === 0) {
+    return "(no trace recorded for this turn)";
+  }
+  const lines: string[] = [`Trace (${events.length} events):`];
+  for (const e of events) {
+    const model = e.model ? ` ${e.model}` : "";
+    const tokens = e.tokens
+      ? ` in=${e.tokens.in} cached=${e.tokens.cached} out=${e.tokens.out}`
+      : "";
+    lines.push(`  - ${e.step} [${e.kind}]${model}${tokens}`);
+    if (e.detail) {
+      lines.push(`      ${e.detail}`);
+    }
+  }
+  return lines.join("\n");
 }
 
 interface UsageTotals {

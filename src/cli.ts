@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { parseArgs } from "node:util";
 import { connect } from "@restatedev/restate-sdk-clients";
-import { formatTurnResult, renderProgress } from "./cli.output.js";
+import { formatTurnResult, renderProgress, renderTrace } from "./cli.output.js";
+import type { Health } from "./services/health.js";
 import type { SessionObject } from "./session/session.js";
 
 const INGRESS_URL = process.env.RESTATE_INGRESS_URL ?? "http://localhost:8080";
@@ -66,13 +67,26 @@ async function cmdProgress(sessionId: string): Promise<void> {
   console.log(renderProgress(p));
 }
 
+async function cmdTrace(sessionId: string, turnId?: string): Promise<void> {
+  const events = await sessionClients(sessionId).obj.getTrace({ turnId });
+  console.log(renderTrace(events));
+}
+
+async function cmdHealth(): Promise<void> {
+  const rs = connect({ url: INGRESS_URL });
+  const res = await rs.serviceClient<Health>({ name: "health" }).check();
+  console.log(JSON.stringify(res, null, 2));
+}
+
 function usage(): void {
   console.log(
     [
       "Usage:",
-      "  npm run cli start                      # create a session, print its id",
-      '  npm run cli turn <sessionId> "<msg>"   # send a turn and stream progress',
-      "  npm run cli progress <sessionId>       # print current progress once",
+      "  npm run cli start                       # create a session, print its id",
+      '  npm run cli turn <sessionId> "<msg>"    # send a turn and stream progress',
+      "  npm run cli progress <sessionId>        # print current progress once",
+      "  npm run cli trace <sessionId> [turnId]  # print a turn's trace transcript",
+      "  npm run cli health                      # print service readiness",
     ].join("\n"),
   );
 }
@@ -106,6 +120,17 @@ async function main(): Promise<void> {
         return;
       }
       await cmdProgress(sessionId);
+      break;
+    case "trace":
+      if (!sessionId) {
+        usage();
+        process.exitCode = 1;
+        return;
+      }
+      await cmdTrace(sessionId, rest[0]);
+      break;
+    case "health":
+      await cmdHealth();
       break;
     default:
       usage();
