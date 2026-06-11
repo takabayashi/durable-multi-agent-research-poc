@@ -1,5 +1,13 @@
 # Durable Multi-Agent Research
 
+[![CI](https://github.com/takabayashi/durable-multi-agent-research-poc/actions/workflows/ci.yml/badge.svg)](https://github.com/takabayashi/durable-multi-agent-research-poc/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
+[![Built on Restate](https://img.shields.io/badge/built%20on-Restate-E5308A)](https://docs.restate.dev)
+![OpenAI](https://img.shields.io/badge/OpenAI-412991?logo=openai&logoColor=white)
+[![Code style: Biome](https://img.shields.io/badge/code%20style-Biome-60A5FA?logo=biome&logoColor=white)](https://biomejs.dev)
+
 A proof-of-concept backend service that powers a multi-turn research assistant on top of [Restate](https://docs.restate.dev) (a durable-execution engine). A user opens a session and sends turns; the system decomposes each research question, investigates sub-questions in parallel, and synthesizes a structured, cited answer. The headline property is **durability**: long-running research survives process restarts, and expensive operations (LLM calls, web searches) are never repeated unnecessarily.
 
 See [`docs/architecture.md`](docs/architecture.md) for a visual architecture map (16 diagrams, rendered inline on GitHub), [`docs/requirements.md`](docs/requirements.md) for the full PRD, [`docs/TODO.md`](docs/TODO.md) for the phased build plan, and [`docs/decisions.md`](docs/decisions.md) for the decision log.
