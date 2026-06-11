@@ -127,15 +127,19 @@ independently verifiable, and ends in a runnable state.
 ## Phase 7 — Refinement + result reuse
 
 > Goal: "go deeper on point N" reuses relevant prior work instead of restarting. (FR5)
+>
+> Scope note: implemented as a conversation journal (the planner/synthesizer see prior turns) rather
+> than a normalized-hash sub-result cache, plus a compactor agent to keep the journal bounded. See
+> `docs/decisions.md` ("Phase 7").
 
-- [ ] Store prior sub-results keyed by a normalized question hash with timestamps in session state.
-- [ ] On refinement, reuse fresh prior sub-results (within `FRESHNESS_TTL`) and investigate only the deeper angle; otherwise refresh. (FR5)
-- [ ] Surface "what was reused vs redone" in the turn result.
-- [ ] **Security:** bound reuse lookups; expire stale entries to avoid serving outdated research.
-- [ ] **Docs:** document the reuse/freshness model and how it differs from idempotency.
+- [x] Reuse prior work from session state: feed a journal of prior turns to the planner/synthesizer (no separate hash cache).
+- [x] On a follow-up, the journal-aware planner investigates only NEW sub-questions and answers the rest from context; turns older than `FRESHNESS_TTL` drop out and are re-researched. (FR5)
+- [x] Surface "what was reused vs redone" in the turn result (CLI: reused prior turns vs new sub-questions; context token line).
+- [x] **Security:** bound reuse lookups; expire stale entries (journal capped + token-budget compaction; stale turns expire via `FRESHNESS_TTL`).
+- [x] **Docs:** document the reuse/freshness/compaction model and how it differs from idempotency.
 
 **Acceptance criteria**
-- [ ] A refinement turn reuses prior sub-results (observable: fewer new LLM/tool calls).
+- [ ] A refinement turn reuses prior work (observable: fewer new LLM/tool calls).
 - [ ] Stale prior work (beyond `FRESHNESS_TTL`) triggers a refresh.
 - [ ] The result distinguishes reused vs newly-computed parts.
 

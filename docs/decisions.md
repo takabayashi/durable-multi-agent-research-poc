@@ -447,3 +447,41 @@ that references it).
   natural-language queries).
 - **Made by:** Human+Agent
 - **Date:** 2026-06-10
+
+## Phase 7 — Refinement + result reuse
+
+### Conversational refinement via a session journal (not a hash cache)
+- **Decision:** Follow-up turns reuse prior work by feeding a *journal* of prior turns (their
+  questions, key findings, and answers) to the planner and synthesizer. The planner is journal-aware:
+  it emits only the NEW sub-questions still needed (0..MAX) and answers the rest from context (an empty
+  list -> the synthesizer composes from the journal). Reuse reads from existing `turns` state; there is
+  no separate sub-result cache. Entry stays a normal `turn` (no `refine` command).
+- **Supersedes:** the planned "normalized-question-hash sub-result cache" and a later
+  "explicit `reusePriorIds` catalog" draft (both in the Phase-7 plan history).
+- **Alternatives:** the hash cache (opportunistic; couldn't resolve "go deeper on point 3" without
+  prior context); an explicit `refine N` CLI command + reuse-id selection (more machinery, less
+  natural).
+- **Rationale / trade-offs:** the assignment frames refinement as conversational follow-ups over a
+  prior answer, which needs the prior context in-hand — exactly what a journal provides — not text
+  hashing. Trade-off: "only new sub-questions" leans on the (nano) planner; few-shot examples cover it
+  and the planner model is the lever if it underperforms. A pure reuse-only answer may carry few fresh
+  citations (a "go deeper" follow-up triggers new research, hence new sources).
+- **Made by:** Human+Agent
+- **Date:** 2026-06-10
+
+### Context compaction via a rolling-summary compactor agent
+- **Decision:** Bound the journal with a token budget: when its estimated size (`~chars/4` heuristic)
+  exceeds `CONTEXT_MAX_TOKENS`, a durable compactor agent (`OPENAI_MODEL_COMPACTOR`, cheap) folds the
+  oldest turns into a persisted rolling `summary` in one call, keeping the most recent
+  `MAX_JOURNAL_TURNS` verbatim. The journal is then `summary + recent verbatim turns`. Stale turns
+  (older than `FRESHNESS_TTL`) drop out and are re-researched. The CLI surfaces `Context: ~N / M tokens`
+  and a `(compacting…)` indicator.
+- **Alternatives:** a real tokenizer (`gpt-tokenizer`) for exact counts; hard-dropping oldest turns (no
+  summary); an iterative fold-to-target loop (multiple compactor calls per turn).
+- **Rationale / trade-offs:** an unbounded journal eventually blows the context window and cost; a
+  rolling summary keeps the gist cheaply. The heuristic estimate is approximate (a tokenizer is a noted
+  upgrade); a single fold-all-but-recent call keeps compaction to one durable step (deterministic,
+  replays on resume) instead of a multi-call loop. The summary is not re-expired by `FRESHNESS_TTL`
+  (TTL applies to verbatim turns) — accepted for the POC.
+- **Made by:** Human+Agent
+- **Date:** 2026-06-10

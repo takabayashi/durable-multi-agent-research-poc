@@ -10,11 +10,13 @@ unnecessarily.
 See [`docs/requirements.md`](docs/requirements.md) for the full PRD, [`docs/TODO.md`](docs/TODO.md) for
 the phased build plan, and [`docs/decisions.md`](docs/decisions.md) for the decision log.
 
-> Status: **Phase 6** — durability hardening. A turn runs a real planner and synthesizer, sub-questions
-> are investigated by real ReAct loops over `web_search` (Tavily) + `fetch_page` fanned out concurrently
-> (bounded by `MAX_CONCURRENCY`), and long LLM calls get raised Restate inactivity/abort timeouts so
-> they aren't treated as stuck. See [`docs/prompts.md`](docs/prompts.md) for the prompt/tool/LLM-wrapper
-> design, "Durability & crash-resume" below, and [`docs/TODO.md`](docs/TODO.md) for the roadmap.
+> Status: **Phase 7** — conversational refinement + context compaction. Follow-up turns reuse the
+> session's prior work: each turn feeds a journal of earlier turns to the planner/synthesizer, which
+> investigate only what's new and answer the rest from context. A compactor agent folds older turns
+> into a rolling summary once the journal outgrows a token budget. Earlier phases still apply (real
+> planner/synthesizer, parallel investigators, durability hardening). See
+> [`docs/prompts.md`](docs/prompts.md), "Refinement & reuse" / "Durability & crash-resume" below, and
+> [`docs/TODO.md`](docs/TODO.md) for the roadmap.
 
 ## Prerequisites
 
@@ -119,12 +121,37 @@ npm run dev                             # same port; Restate redelivers the in-f
 #    LLM/tool steps appear as replayed, not re-executed.
 ```
 
+## Refinement & reuse
+
+Sessions are conversational: a follow-up `turn` reuses the session's prior work instead of starting
+over. Each turn assembles a **journal** of earlier turns (their questions, key findings, and answers)
+and feeds it to the planner and synthesizer. The planner then emits only the **new** sub-questions
+still needed — investigating just the deeper/novel angle and reusing the rest — or none at all when the
+journal already answers the message (the synthesizer composes from context). The CLI prints, per turn,
+how many prior turns were reused vs. how many new sub-questions were investigated.
+
+```bash
+npm run cli turn <sessionId> "Compare Datadog and Snowflake over the last three years"
+npm run cli turn <sessionId> "go deeper on Snowflake's margins"   # reuses the rest; investigates one new angle
+```
+
+Freshness: prior turns older than `FRESHNESS_TTL` drop out of the journal and are re-researched if
+asked again.
+
+### Context compaction
+
+The journal can't grow forever, so when its estimated size exceeds `CONTEXT_MAX_TOKENS` a **compactor
+agent** folds the oldest turns into a rolling summary, keeping the most recent `MAX_JOURNAL_TURNS`
+verbatim. Compaction is a durable step (it replays, never re-summarizes, on resume). Per turn the CLI
+shows a `Context: ~N / M tokens` line and a `(compacting prior context…)` indicator while it runs.
+
 ## Project layout
 
 ```
 src/
   app.ts              # endpoint entrypoint: binds services, listens on :9080
   cli.ts              # CLI client (start / turn / progress)
+  cli.output.ts       # pure CLI presentation helpers (progress, results)
   greeting.ts         # pure greeting logic (unit-tested)
   services/
     greeter.ts        # Phase 0 durable "greeter" service
@@ -139,9 +166,11 @@ src/
     url.ts            # normalizeUrl for source dedup
   agents/
     orchestrator.ts   # per-turn flow: plan -> investigate -> synthesize (runResearch)
-    planner.ts        # durable plan(); planner.prompt.ts holds its prompt + schema
+    planner.ts        # durable plan() (journal-aware); planner.prompt.ts holds its prompt + schema
     investigator.ts   # stateless investigator service (ReAct loop); investigator.prompt.ts holds its prompt
     synthesizer.ts    # durable synthesize(); synthesizer.prompt.ts holds its prompt + schema
+    journal.ts        # pure: build the conversation journal + token estimate
+    compactor.ts      # durable rolling-summary compactor; compactor.prompt.ts holds its prompt + schema
   session/
     session.ts        # durable Session virtual object (start/sendTurn/getProgress/getResult)
     types.ts          # session / turn / progress types
@@ -157,7 +186,8 @@ Configuration is via environment variables (see [`.env.example`](.env.example)).
 runtime. `MAX_CONCURRENCY` (default 3) bounds how many investigators run at once. `PORT` (default
 `9080`) sets the service endpoint. The durability knobs (`OPENAI_TIMEOUT_MS`, `OPENAI_MAX_RETRIES`,
 `RESTATE_INACTIVITY_TIMEOUT_MS`, `RESTATE_ABORT_TIMEOUT_MS`) are covered in "Durability &
-crash-resume". The freshness knob is used from Phase 7+.
+crash-resume"; the refinement/compaction knobs (`FRESHNESS_TTL`, `MAX_JOURNAL_TURNS`,
+`CONTEXT_MAX_TOKENS`, `JOURNAL_MAX_CHARS_PER_TURN`, `OPENAI_MODEL_COMPACTOR`) in "Refinement & reuse".
 
 ## Continuous integration
 
